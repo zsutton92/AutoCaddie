@@ -1,0 +1,131 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AutoCaddie.MainPage"
+             Title="AutoCaddie">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="History" Clicked="OnHistory_Clicked" Order="Primary" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto, *">
+
+        <!-- Row 0: Search Bar -->
+        <SearchBar x:Name="CourseSearchBar"
+                   Placeholder="Search for a golf course..."
+                   SearchButtonPressed="OnSearchButtonPressed"
+                   Grid.Row="0"
+                   Margin="10" />
+
+        <!-- Row 1: Content Area -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="15" Padding="10,0">
+
+                <!-- Saved / Home Courses Header -->
+                <Label x:Name="SavedHeaderLabel" 
+                       Text="My Courses" 
+                       FontSize="18" 
+                       FontAttributes="Bold" 
+                       Margin="5,5,0,0"/>
+
+                <!-- List of Saved Courses -->
+                <CollectionView x:Name="SavedCoursesList"
+                                SelectionMode="Single"
+                                SelectionChanged="OnSavedCourseSelected">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <!-- .NET 9 Updated Border Control -->
+                            <Border Margin="0,4" 
+                                    Padding="15,10" 
+                                    BackgroundColor="White" 
+                                    StrokeThickness="0">
+
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="12" />
+                                </Border.StrokeShape>
+
+                                <Border.Shadow>
+                                    <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.1" />
+                                </Border.Shadow>
+
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                                        <!-- FORCE TextColor to Black so it never vanishes in Dark Mode -->
+                                        <Label Text="{Binding Name}" 
+                                               FontSize="18" 
+                                               FontAttributes="Bold" 
+                                               TextColor="Black" />
+
+                                        <!-- Explicitly set to Gray -->
+                                        <Label Text="{Binding LocationDetails}" 
+                                               FontSize="14" 
+                                               TextColor="#666666" />
+                                    </VerticalStackLayout>
+
+                                    <!-- Favorite / Home Star Button -->
+                                    <ImageButton Grid.Column="1"
+                                                 Source="{Binding FavoriteIcon}"
+                                                 HeightRequest="28"
+                                                 WidthRequest="28"
+                                                 VerticalOptions="Center"
+                                                 Clicked="OnFavoriteToggle_Clicked"
+                                                 CommandParameter="{Binding .}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Divider -->
+                <BoxView HeightRequest="1" Color="LightGray" Margin="0,10" />
+
+                <!-- Search Results Header -->
+                <Label x:Name="SearchHeaderLabel" 
+                       Text="Search Results" 
+                       FontSize="18" 
+                       FontAttributes="Bold" 
+                       Margin="5,0,0,0"
+                       IsVisible="False"/>
+
+                <!-- Search Results List -->
+                <CollectionView x:Name="ResultsList"
+                                SelectionMode="Single"
+                                SelectionChanged="OnCourseSelected">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <!-- .NET 9 Updated Border Control -->
+                            <Border Margin="0,4" 
+                                    Padding="15,10" 
+                                    BackgroundColor="White"
+                                    Stroke="LightGray"
+                                    StrokeThickness="1">
+
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="10" />
+                                </Border.StrokeShape>
+
+                                <Grid RowDefinitions="Auto, Auto">
+                                    <!-- FIX ADDED HERE: TextColor="Black" -->
+                                    <Label Grid.Row="0" 
+                                           Text="{Binding Name}" 
+                                           FontSize="16" 
+                                           FontAttributes="Bold" 
+                                           TextColor="Black" />
+
+                                    <!-- FIX ADDED HERE: TextColor="#666666" for consistency -->
+                                    <Label Grid.Row="1" 
+                                           Text="{Binding LocationDetails}" 
+                                           FontSize="12" 
+                                           TextColor="#666666" 
+                                           Margin="0,2,0,0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>
