@@ -15,16 +15,25 @@
                         <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.1" />
                     </Border.Shadow>
 
-                    <Grid ColumnDefinitions="*, Auto">
-                        <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <!-- Row 0: Course Name & Date -->
+                        <VerticalStackLayout Grid.Row="0" Grid.Column="0" VerticalOptions="Center">
                             <Label Text="{Binding CourseName}" FontSize="18" FontAttributes="Bold" />
                             <Label Text="{Binding DatePlayed, StringFormat='{0:MMM dd, yyyy}'}" FontSize="14" TextColor="Gray" />
                         </VerticalStackLayout>
 
-                        <VerticalStackLayout Grid.Column="1" HorizontalOptions="End" VerticalOptions="Center">
+                        <!-- Row 0: Total Score -->
+                        <VerticalStackLayout Grid.Row="0" Grid.Column="1" HorizontalOptions="End" VerticalOptions="Center">
                             <Label Text="SCORE" FontSize="10" TextColor="Gray" HorizontalTextAlignment="End" />
                             <Label Text="{Binding TotalScore}" FontSize="24" FontAttributes="Bold" HorizontalTextAlignment="End"/>
                         </VerticalStackLayout>
+
+                        <!-- Row 1: The New Stats Row -->
+                        <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="15" Margin="0,10,0,0">
+                            <Label Text="{Binding TotalGIR, StringFormat='GIR: {0}'}" FontSize="12" TextColor="#4A34D4" FontAttributes="Bold" />
+                            <Label Text="{Binding TotalFIR, StringFormat='FIR: {0}'}" FontSize="12" TextColor="#4A34D4" FontAttributes="Bold" />
+                            <Label Text="{Binding TotalPutts, StringFormat='Putts: {0}'}" FontSize="12" TextColor="#4A34D4" FontAttributes="Bold" />
+                        </HorizontalStackLayout>
                     </Grid>
                 </Border>
             </DataTemplate>

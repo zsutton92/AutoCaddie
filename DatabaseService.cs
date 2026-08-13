@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Text;
 using SQLite;
 using AutoCaddie.Models;
+using System.Net.Http;
+using System.Text.Json;
+using Microsoft.Maui.Devices.Sensors;
 
 namespace AutoCaddie.Services;
 
@@ -51,6 +54,25 @@ public class DatabaseService
             };
             await _db.InsertAllAsync(myBag);
         }
+    }
+
+    public async Task SaveClubAsync(GolfClub club)
+    {
+        await Init();
+        if (club.Id != 0)
+        {
+            await _db.UpdateAsync(club);
+        }
+        else
+        {
+            await _db.InsertAsync(club);
+        }
+    }
+
+    public async Task DeleteClubAsync(GolfClub club)
+    {
+        await Init();
+        await _db.DeleteAsync(club);
     }
 
     //public async Task SaveHoleAsync(GolfHole hole)
@@ -115,57 +137,68 @@ public class DatabaseService
         }
     }
 
-    public async Task SaveCompletedRoundAsync(string courseName, List<GolfHole> courseHoles, Dictionary<int, int> roundScores)
+
+    public async Task SaveCompletedRoundAsync(string courseName, List<AutoCaddie.Models.GolfHole> holes, Dictionary<int, int> scores, Dictionary<int, int> putts, Dictionary<int, bool?> fairways)
     {
         await Init();
 
-        int totalScore = 0;
-        int totalPar = 0;
+        // 1. Sum up the totals for the main round summary
+        int totalScore = scores.Values.Sum();
+        int totalPutts = putts.Values.Sum();
+        int totalGIR = 0;
+        int totalFIR = 0;
 
-        // Calculate totals
-        foreach (var hole in courseHoles)
+        // 2. Tally up the FIR and GIR before saving the round
+        foreach (var hole in holes)
         {
-            totalPar += hole.Par;
-            if (roundScores.ContainsKey(hole.HoleNumber))
-            {
-                totalScore += roundScores[hole.HoleNumber];
-            }
+            int holeScore = scores.ContainsKey(hole.HoleNumber) ? scores[hole.HoleNumber] : hole.Par;
+            int holePutts = putts.ContainsKey(hole.HoleNumber) ? putts[hole.HoleNumber] : 0;
+            bool? hitFairway = fairways.ContainsKey(hole.HoleNumber) ? fairways[hole.HoleNumber] : null;
+
+            if ((holeScore - holePutts) <= (hole.Par - 2)) totalGIR++;
+            if (hitFairway == true) totalFIR++;
         }
 
-        // 1. Create and save the main Round record
-        var newRound = new GolfRound
+        // 3. Create and save the ONE summary record for the entire round
+        var newRound = new AutoCaddie.Models.GolfRound
         {
             CourseName = courseName,
             DatePlayed = DateTime.Now,
             TotalScore = totalScore,
-            TotalPar = totalPar
+            TotalPutts = totalPutts,
+            TotalGIR = totalGIR,
+            TotalFIR = totalFIR
         };
 
         await _db.InsertAsync(newRound);
 
-        // 2. Save each individual hole score linked to the Round ID
-        foreach (var hole in courseHoles)
+        // 4. Loop through again to save the 18 individual hole records
+        foreach (var hole in holes)
         {
-            int strokes = roundScores.ContainsKey(hole.HoleNumber) ? roundScores[hole.HoleNumber] : hole.Par; // Default to par if skipped
+            int holeScore = scores.ContainsKey(hole.HoleNumber) ? scores[hole.HoleNumber] : hole.Par;
+            int holePutts = putts.ContainsKey(hole.HoleNumber) ? putts[hole.HoleNumber] : 0;
+            bool? hitFairway = fairways.ContainsKey(hole.HoleNumber) ? fairways[hole.HoleNumber] : null;
 
-            var holeScore = new HoleScore
+            var scoreRecord = new AutoCaddie.Models.HoleScore
             {
                 RoundId = newRound.Id,
                 HoleNumber = hole.HoleNumber,
                 Par = hole.Par,
-                Strokes = strokes
+                Strokes = holeScore,
+                Putts = holePutts,
+                HitFairway = hitFairway
             };
 
-            await _db.InsertAsync(holeScore);
+            await _db.InsertAsync(scoreRecord);
         }
     }
 
     // Fetches all completed rounds, sorted by newest first
-    public async Task<List<GolfRound>> GetAllRoundsAsync()
-    {
-        await Init();
-        return await _db.Table<GolfRound>().OrderByDescending(r => r.DatePlayed).ToListAsync();
-    }
+    //public async Task<List<GolfRound>> GetAllRoundsAsync()
+    //{
+    //    await Init();
+    //    return await _db.Table<GolfRound>().OrderByDescending(r => r.DatePlayed).ToListAsync();
+    //}
 
     // Fetches the specific hole-by-hole scores for a single round
     public async Task<List<HoleScore>> GetScoresForRoundAsync(int roundId)
@@ -200,4 +233,66 @@ public class DatabaseService
             await _db.UpdateAsync(club);
         }
     }
+
+    // Gets the high-level summary of all your rounds
+    public async Task<List<AutoCaddie.Models.GolfRound>> GetAllRoundsAsync()
+    {
+        await Init();
+        // Order by newest rounds first
+        return await _db.Table<AutoCaddie.Models.GolfRound>()
+                        .OrderByDescending(r => r.DatePlayed)
+                        .ToListAsync();
+    }
+
+    // Gets the 18-hole breakdown for a specific round
+    public async Task<List<AutoCaddie.Models.HoleScore>> GetHoleScoresAsync(int roundId)
+    {
+        await Init();
+        return await _db.Table<AutoCaddie.Models.HoleScore>()
+                        .Where(s => s.RoundId == roundId)
+                        .OrderBy(s => s.HoleNumber)
+                        .ToListAsync();
+    }
+
+    public async Task DeleteCourseAsync(string courseName)
+    {
+        await Init();
+
+        // 1. Delete all holes for this course
+        var holes = await _db.Table<GolfHole>().Where(h => h.CourseName == courseName).ToListAsync();
+        foreach (var hole in holes)
+        {
+            await _db.DeleteAsync(hole);
+        }
+
+        // 2. Delete all map features (fairways, greens, etc.) for this course
+        var features = await _db.Table<CourseMapFeature>().Where(f => f.CourseName == courseName).ToListAsync();
+        foreach (var feature in features)
+        {
+            await _db.DeleteAsync(feature);
+        }
+    }
+
+    public async Task RenameCourseAsync(string oldName, string newName)
+    {
+        await Init();
+
+        // 1. Update holes
+        var holes = await _db.Table<GolfHole>().Where(h => h.CourseName == oldName).ToListAsync();
+        foreach (var hole in holes)
+        {
+            hole.CourseName = newName;
+            await _db.UpdateAsync(hole);
+        }
+
+        // 2. Update map features
+        var features = await _db.Table<CourseMapFeature>().Where(f => f.CourseName == oldName).ToListAsync();
+        foreach (var feature in features)
+        {
+            feature.CourseName = newName;
+            await _db.UpdateAsync(feature);
+        }
+    }
+
+
 }

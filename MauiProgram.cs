@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
+using Microcharts.Maui;
 
 namespace AutoCaddie
 {
@@ -12,6 +13,7 @@ namespace AutoCaddie
             builder
                 .UseMauiApp<App>()
                 .UseMauiMaps()
+                .UseMicrocharts()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

@@ -10,4 +10,9 @@ public class GolfRound
     public DateTime DatePlayed { get; set; }
     public int TotalScore { get; set; }
     public int TotalPar { get; set; }
+
+    public int TotalPutts { get; set; }
+
+    public int TotalGIR { get; set; }
+    public int TotalFIR { get; set; }
 }

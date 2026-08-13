@@ -1,39 +1,45 @@
 using AutoCaddie.Models;
-using AutoCaddie.Services;
-using System.Collections.ObjectModel;
 
-namespace AutoCaddie;
-
-public partial class RoundHistoryPage : ContentPage
+namespace AutoCaddie
 {
-    private DatabaseService _dbService = new();
-    public ObservableCollection<GolfRound> Rounds { get; set; } = new();
-
-    public RoundHistoryPage()
+    public partial class RoundHistoryPage : ContentPage
     {
-        InitializeComponent();
-        HistoryList.ItemsSource = Rounds;
-    }
+        private Services.DatabaseService _dbService;
 
-    protected override async void OnAppearing()
-    {
-        base.OnAppearing();
-        Rounds.Clear();
-
-        var pastRounds = await _dbService.GetAllRoundsAsync();
-        foreach (var r in pastRounds)
+        public RoundHistoryPage()
         {
-            Rounds.Add(r);
+            InitializeComponent();
+            _dbService = new Services.DatabaseService();
         }
-    }
 
-    private async void OnRoundSelected(object sender, SelectionChangedEventArgs e)
-    {
-        if (e.CurrentSelection.FirstOrDefault() is GolfRound selectedRound)
+        protected override async void OnAppearing()
         {
-            HistoryList.SelectedItem = null;
-            // Push to the detailed Scorecard Page
-            await Navigation.PushAsync(new ScorecardPage(selectedRound));
+            base.OnAppearing();
+            await LoadHistoryAsync();
+        }
+
+        private async Task LoadHistoryAsync()
+        {
+            // Fetch all saved rounds, ordered by newest first
+            var rounds = await _dbService.GetAllRoundsAsync();
+
+            // BOUND TO XAML: Targets x:Name="HistoryList"
+            HistoryList.ItemsSource = rounds;
+        }
+
+        private async void OnRoundSelected(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.CurrentSelection.FirstOrDefault() is GolfRound selectedRound)
+            {
+                // Fetch the 18-hole breakdown for this specific round
+                var roundScores = await _dbService.GetHoleScoresAsync(selectedRound.Id);
+
+                // Push to the dashboard, passing the summary and the hole data
+                await Navigation.PushAsync(new ScorecardPage(selectedRound, roundScores));
+
+                // Clear the selection so the card doesn't stay highlighted
+                ((CollectionView)sender).SelectedItem = null;
+            }
         }
     }
 }

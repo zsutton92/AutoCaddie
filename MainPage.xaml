@@ -2,127 +2,243 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AutoCaddie.MainPage"
-             Title="AutoCaddie">
+             Title="AutoCaddie"
+             BackgroundColor="#F8F9FA">
 
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="History" Clicked="OnHistory_Clicked" Order="Primary" />
-    </ContentPage.ToolbarItems>
+    <Grid RowDefinitions="Auto, *" Padding="15">
 
-    <Grid RowDefinitions="Auto, *">
+        <!-- Row 0: Modern Search Container -->
+        <Border Grid.Row="0" 
+                BackgroundColor="White" 
+                StrokeThickness="0" 
+                Padding="5,0" 
+                Margin="0,0,0,15">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="25" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,2" Radius="6" Opacity="0.08" />
+            </Border.Shadow>
 
-        <!-- Row 0: Search Bar -->
-        <SearchBar x:Name="CourseSearchBar"
-                   Placeholder="Search for a golf course..."
-                   SearchButtonPressed="OnSearchButtonPressed"
-                   Grid.Row="0"
-                   Margin="10" />
+            <SearchBar x:Name="CourseSearchBar"
+                       Placeholder="Search golf courses..."
+                       SearchButtonPressed="OnSearchButtonPressed"
+                       BackgroundColor="Transparent"
+                       TextColor="Black"
+                       PlaceholderColor="#888888" />
+        </Border>
 
         <!-- Row 1: Content Area -->
         <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="15" Padding="10,0">
+            <VerticalStackLayout Spacing="20">
 
-                <!-- Saved / Home Courses Header -->
-                <Label x:Name="SavedHeaderLabel" 
-                       Text="My Courses" 
-                       FontSize="18" 
-                       FontAttributes="Bold" 
-                       Margin="5,5,0,0"/>
+                <!-- Quick Action Cards (Manage Bag & History) -->
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="12">
 
-                <!-- List of Saved Courses -->
-                <CollectionView x:Name="SavedCoursesList"
-                                SelectionMode="Single"
-                                SelectionChanged="OnSavedCourseSelected">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <!-- .NET 9 Updated Border Control -->
-                            <Border Margin="0,4" 
-                                    Padding="15,10" 
-                                    BackgroundColor="White" 
-                                    StrokeThickness="0">
+                    <!-- Manage Bag Card -->
+                    <Border Grid.Column="0" 
+                            BackgroundColor="#4A34D4" 
+                            Padding="15" 
+                            StrokeThickness="0">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="16" />
+                        </Border.StrokeShape>
+                        <Border.Shadow>
+                            <Shadow Brush="#4A34D4" Offset="0,4" Radius="8" Opacity="0.3" />
+                        </Border.Shadow>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnMyBag_Clicked" />
+                        </Border.GestureRecognizers>
 
-                                <Border.StrokeShape>
-                                    <RoundRectangle CornerRadius="12" />
-                                </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="🏌️‍♂️" FontSize="22" />
+                            <Label Text="My Bag" FontSize="16" FontAttributes="Bold" TextColor="White" />
+                            <Label Text="Manage clubs" FontSize="11" TextColor="#D1C4E9" />
+                        </VerticalStackLayout>
+                    </Border>
 
-                                <Border.Shadow>
-                                    <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.1" />
-                                </Border.Shadow>
+                    <!-- Round History Card -->
+                    <Border Grid.Column="1" 
+                            BackgroundColor="White" 
+                            Padding="15" 
+                            StrokeThickness="0">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="16" />
+                        </Border.StrokeShape>
+                        <Border.Shadow>
+                            <Shadow Brush="Black" Offset="0,2" Radius="6" Opacity="0.06" />
+                        </Border.Shadow>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnHistory_Clicked" />
+                        </Border.GestureRecognizers>
 
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
-                                        <!-- FORCE TextColor to Black so it never vanishes in Dark Mode -->
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="📊" FontSize="22" />
+                            <Label Text="History" FontSize="16" FontAttributes="Bold" TextColor="Black" />
+                            <Label Text="Past scorecards" FontSize="11" TextColor="Gray" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Saved / Home Courses Section -->
+                <VerticalStackLayout Spacing="10">
+                    <Label x:Name="SavedHeaderLabel" 
+                           Text="My Courses" 
+                           FontSize="18" 
+                           FontAttributes="Bold" 
+                           TextColor="#222222" 
+                           Margin="5,0,0,0"/>
+
+                    <!-- FIXED: SelectionMode set to None, removed SelectionChanged -->
+                    <CollectionView x:Name="SavedCoursesList"
+                                    SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <SwipeView Margin="0,6">
+                                    <!-- Swipe Left to Update Map -->
+                                    <SwipeView.RightItems>
+                                        <SwipeItems Mode="Execute">
+                                            <SwipeItem Text="Update Map" 
+                                                       BackgroundColor="#4A34D4" 
+                                                       Invoked="OnUpdateCourseMap_Invoked" 
+                                                       CommandParameter="{Binding .}" />
+                                        </SwipeItems>
+                                    </SwipeView.RightItems>
+
+                                    <!-- Course Card Content -->
+                                    <Border Padding="16,14" 
+                                            BackgroundColor="White" 
+                                            StrokeThickness="0">
+
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="14" />
+                                        </Border.StrokeShape>
+
+                                        <Border.Shadow>
+                                            <Shadow Brush="Black" Offset="0,2" Radius="6" Opacity="0.05" />
+                                        </Border.Shadow>
+
+                                        <!-- Column Definitions: Text, Delete Button, Favorite Star -->
+                                        <Grid ColumnDefinitions="*, Auto, Auto">
+
+                                            <!-- TOUCH ZONE 1: Course Info (Loads the Course) -->
+                                            <VerticalStackLayout Grid.Column="0" VerticalOptions="Fill" Spacing="2" BackgroundColor="Transparent">
+                                                <VerticalStackLayout.GestureRecognizers>
+                                                    <TapGestureRecognizer Tapped="OnCourseCard_Tapped" CommandParameter="{Binding .}" />
+                                                </VerticalStackLayout.GestureRecognizers>
+
+                                                <Label Text="{Binding Name}" 
+                                                       FontSize="16" 
+                                                       FontAttributes="Bold" 
+                                                       TextColor="Black" />
+
+                                                <HorizontalStackLayout Spacing="6">
+                                                    <Label Text="📍" FontSize="11" VerticalOptions="Center" />
+                                                    <Label Text="{Binding LocationDetails}" 
+                                                           FontSize="13" 
+                                                           TextColor="#666666" 
+                                                           VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                            </VerticalStackLayout>
+
+                                            <!-- TOUCH ZONE 2: Delete Course Button (Does NOT load course) -->
+                                            <Grid Grid.Column="1"
+                                                  WidthRequest="36"
+                                                  HeightRequest="36"
+                                                  VerticalOptions="Center"
+                                                  HorizontalOptions="End"
+                                                  Margin="0,0,5,0">
+
+                                                <!-- The Visual Vector Icon -->
+                                                <Path Data="M6,19 c0,1.1 0.9,2 2,2 h8 c1.1,0 2,-0.9 2,-2 V7 H6 v12 z M19,4 h-3.5 l-1,-1 h-5 l-1,1 H5 v2 h14 V4 z"
+                                                      Fill="#CCCCCC"
+                                                      Aspect="Uniform"
+                                                      WidthRequest="16"
+                                                      HeightRequest="16"
+                                                      VerticalOptions="Center"
+                                                      HorizontalOptions="Center"
+                                                      InputTransparent="True" />
+
+                                                <!-- The Invisible Button -->
+                                                <Button BackgroundColor="Transparent"
+                                                        Clicked="OnDeleteCourse_Clicked"
+                                                        CommandParameter="{Binding .}" />
+                                            </Grid>
+
+                                            <!-- TOUCH ZONE 3: Favorite Star Button (Does NOT load course) -->
+                                            <Grid Grid.Column="2"
+                                                  WidthRequest="40"
+                                                  HeightRequest="40"
+                                                  VerticalOptions="Center"
+                                                  HorizontalOptions="End">
+
+                                                <!-- The Visual Vector Icon -->
+                                                <Path Data="M12,2 L15.09,8.26 L22,9.27 L17,14.14 L18.18,21.02 L12,17.77 L5.82,21.02 L7,14.14 L2,9.27 L8.91,8.26 Z"
+                                                      Fill="{Binding StarFill}"
+                                                      Stroke="{Binding StarStroke}"
+                                                      StrokeThickness="1.5"
+                                                      Aspect="Uniform"
+                                                      WidthRequest="20"
+                                                      HeightRequest="20"
+                                                      VerticalOptions="Center"
+                                                      HorizontalOptions="Center" 
+                                                      InputTransparent="True" />
+
+                                                <!-- The Invisible Button -->
+                                                <Button BackgroundColor="Transparent"
+                                                        Clicked="OnFavoriteToggle_Clicked"
+                                                        CommandParameter="{Binding .}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </SwipeView>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <!-- Search Results Section -->
+                <VerticalStackLayout Spacing="10">
+                    <Label x:Name="SearchHeaderLabel" 
+                           Text="Search Results" 
+                           FontSize="18" 
+                           FontAttributes="Bold" 
+                           TextColor="#222222"
+                           Margin="5,0,0,0"
+                           IsVisible="False"/>
+
+                    <CollectionView x:Name="ResultsList"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnCourseSelected">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,6" 
+                                        Padding="16,14" 
+                                        BackgroundColor="White"
+                                        StrokeThickness="0">
+
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="14" />
+                                    </Border.StrokeShape>
+
+                                    <Border.Shadow>
+                                        <Shadow Brush="Black" Offset="0,2" Radius="6" Opacity="0.05" />
+                                    </Border.Shadow>
+
+                                    <VerticalStackLayout Spacing="2">
                                         <Label Text="{Binding Name}" 
-                                               FontSize="18" 
+                                               FontSize="16" 
                                                FontAttributes="Bold" 
                                                TextColor="Black" />
-
-                                        <!-- Explicitly set to Gray -->
                                         <Label Text="{Binding LocationDetails}" 
-                                               FontSize="14" 
+                                               FontSize="13" 
                                                TextColor="#666666" />
                                     </VerticalStackLayout>
-
-                                    <!-- Favorite / Home Star Button -->
-                                    <ImageButton Grid.Column="1"
-                                                 Source="{Binding FavoriteIcon}"
-                                                 HeightRequest="28"
-                                                 WidthRequest="28"
-                                                 VerticalOptions="Center"
-                                                 Clicked="OnFavoriteToggle_Clicked"
-                                                 CommandParameter="{Binding .}" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-
-                <!-- Divider -->
-                <BoxView HeightRequest="1" Color="LightGray" Margin="0,10" />
-
-                <!-- Search Results Header -->
-                <Label x:Name="SearchHeaderLabel" 
-                       Text="Search Results" 
-                       FontSize="18" 
-                       FontAttributes="Bold" 
-                       Margin="5,0,0,0"
-                       IsVisible="False"/>
-
-                <!-- Search Results List -->
-                <CollectionView x:Name="ResultsList"
-                                SelectionMode="Single"
-                                SelectionChanged="OnCourseSelected">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <!-- .NET 9 Updated Border Control -->
-                            <Border Margin="0,4" 
-                                    Padding="15,10" 
-                                    BackgroundColor="White"
-                                    Stroke="LightGray"
-                                    StrokeThickness="1">
-
-                                <Border.StrokeShape>
-                                    <RoundRectangle CornerRadius="10" />
-                                </Border.StrokeShape>
-
-                                <Grid RowDefinitions="Auto, Auto">
-                                    <!-- FIX ADDED HERE: TextColor="Black" -->
-                                    <Label Grid.Row="0" 
-                                           Text="{Binding Name}" 
-                                           FontSize="16" 
-                                           FontAttributes="Bold" 
-                                           TextColor="Black" />
-
-                                    <!-- FIX ADDED HERE: TextColor="#666666" for consistency -->
-                                    <Label Grid.Row="1" 
-                                           Text="{Binding LocationDetails}" 
-                                           FontSize="12" 
-                                           TextColor="#666666" 
-                                           Margin="0,2,0,0"/>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
 
             </VerticalStackLayout>
         </ScrollView>

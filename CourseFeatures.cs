@@ -1,10 +1,12 @@
 ﻿using System.Text.Json;
+using SQLite;
 
 namespace AutoCaddie.Models
 {
     public class CourseMapFeature
     {
         // Primary Key for SQLite
+        [PrimaryKey, AutoIncrement]
         public int Id { get; set; }
 
         public string CourseName { get; set; }

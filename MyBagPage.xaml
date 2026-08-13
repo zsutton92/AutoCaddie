@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AutoCaddie.MyBagPage"
+             Title="My Bag"
+             BackgroundColor="#F8F9FA">
+
+    <Grid RowDefinitions="Auto, Auto, *" Padding="15">
+
+        <!-- 1. Settings & Training Mode -->
+        <Border Grid.Row="0" BackgroundColor="White" Padding="15" Margin="0,0,0,15" StrokeThickness="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.1" />
+            </Border.Shadow>
+            <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                <VerticalStackLayout Grid.Column="0">
+                    <Label Text="Training Mode" FontSize="18" FontAttributes="Bold" TextColor="Black" />
+                    <Label Text="Prompt for club selection after every shot." FontSize="12" TextColor="Gray" />
+                </VerticalStackLayout>
+                <Switch x:Name="TrainingModeSwitch" Grid.Column="1" Toggled="OnTrainingMode_Toggled" OnColor="#4A34D4" />
+            </Grid>
+        </Border>
+
+        <!-- 2. Add New Club Form -->
+        <Border Grid.Row="1" BackgroundColor="White" Padding="15" Margin="0,0,0,15" StrokeThickness="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.1" />
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Add to Bag" FontSize="18" FontAttributes="Bold" TextColor="Black" />
+                <Grid ColumnDefinitions="*, *, Auto" ColumnSpacing="10">
+                    <Entry x:Name="ClubNameEntry" Grid.Column="0" Placeholder="Club (e.g. 7i)" TextColor="Black" />
+                    <Entry x:Name="ClubDistanceEntry" Grid.Column="1" Placeholder="Est. Yards" Keyboard="Numeric" TextColor="Black" />
+                    <Button Grid.Column="2" Text="Add" BackgroundColor="#4A34D4" TextColor="White" CornerRadius="8" Clicked="OnAddClub_Clicked" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 3. Your Current Bag List -->
+        <CollectionView x:Name="BagListView" Grid.Row="2">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border BackgroundColor="White" Padding="15" Margin="0,5" StrokeThickness="0">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        <Border.Shadow>
+                            <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.05" />
+                        </Border.Shadow>
+
+                        <!-- 4 Columns: Club Name, Avg Yards, Edit Icon, Delete Icon -->
+                        <Grid ColumnDefinitions="*, Auto, 44, 44" VerticalOptions="Center">
+
+                            <!-- Club Name -->
+                            <Label Grid.Column="0" Text="{Binding Name}" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" TextColor="Black" />
+
+                            <!-- Average Distance -->
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Margin="0,0,15,0">
+                                <Label Text="AVG YARDS" FontSize="10" TextColor="Gray" HorizontalOptions="Center" />
+                                <Label Text="{Binding AverageYardage, StringFormat='{0:F0}'}" FontSize="20" FontAttributes="Bold" TextColor="#4A34D4" HorizontalOptions="Center" />
+                            </VerticalStackLayout>
+
+                            <!-- VECTOR EDIT BUTTON (Pencil) -->
+                            <Border Grid.Column="2" 
+                                    WidthRequest="36" 
+                                    HeightRequest="36" 
+                                    BackgroundColor="Transparent" 
+                                    StrokeThickness="0"
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Center">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnEditClub_Clicked" CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Path Data="M3,17.25 V21 h3.75 L17.81,9.94 l-3.75,-3.75 L3,17.25 z M20.71,7.04 c0.39,-0.39 0.39,-1.02 0,-1.41 l-2.34,-2.34 c-0.39,-0.39 -1.02,-0.39 -1.41,0 l-1.83,1.83 l3.75,3.75 l1.83,-1.83 z"
+                                      Fill="#555555"
+                                      Aspect="Uniform"
+                                      WidthRequest="18"
+                                      HeightRequest="18"
+                                      VerticalOptions="Center"
+                                      HorizontalOptions="Center" />
+                            </Border>
+
+                            <!-- VECTOR DELETE BUTTON (Trash Can) -->
+                            <Border Grid.Column="3" 
+                                    WidthRequest="36" 
+                                    HeightRequest="36" 
+                                    BackgroundColor="Transparent" 
+                                    StrokeThickness="0"
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Center">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnDeleteClub_Clicked" CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Path Data="M6,19 c0,1.1 0.9,2 2,2 h8 c1.1,0 2,-0.9 2,-2 V7 H6 v12 z M19,4 h-3.5 l-1,-1 h-5 l-1,1 H5 v2 h14 V4 z"
+                                      Fill="#D32F2F"
+                                      Aspect="Uniform"
+                                      WidthRequest="18"
+                                      HeightRequest="18"
+                                      VerticalOptions="Center"
+                                      HorizontalOptions="Center" />
+                            </Border>
+
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

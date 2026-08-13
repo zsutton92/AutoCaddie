@@ -23,9 +23,29 @@ namespace AutoCaddie
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+            await RequestLocationPermissionOnStartup();
             await LoadSavedCoursesFromDbAsync();
         }
+        private async Task RequestLocationPermissionOnStartup()
+        {
+            var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
 
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            }
+
+            if (status != PermissionStatus.Granted)
+            {
+                // Optional: A friendly nudge if they deny it on startup
+                await DisplayAlert("GPS Required", "AutoCaddie needs location access to give you accurate yardages on the course.", "Got it");
+            }
+        }
+
+        private async void OnMyBag_Clicked(object sender, EventArgs e)
+        {
+            await Navigation.PushAsync(new MyBagPage());
+        }
         // Loads courses already saved in local SQLite database
         private async Task LoadSavedCoursesFromDbAsync()
         {
@@ -47,7 +67,7 @@ namespace AutoCaddie
                         Name = group.Key,
                         LocationDetails = $"{group.Count()} Holes Mapped",
                         IsFavorite = isFav,
-                        FavoriteIcon = isFav ? "star_filled.png" : "star_outline.png"
+                        //FavoriteIcon = isFav ? "star_filled.png" : "star_outline.png"
                     });
                 }
 
@@ -58,6 +78,65 @@ namespace AutoCaddie
                 SavedHeaderLabel.IsVisible = false;
             }
         }
+        private async void OnUpdateCourseMap_Invoked(object sender, EventArgs e)
+        {
+            if (sender is SwipeItem item && item.CommandParameter is CourseSearchResult course)
+            {
+                bool confirm = await DisplayAlert("Update Map", $"Do you want to re-download the latest OSM mapping data for {course.Name}?", "Yes, Update", "Cancel");
+
+                if (confirm)
+                {
+                    CourseSearchBar.Text = $"Updating {course.Name} maps...";
+
+                    var dbService = new AutoCaddie.Services.DatabaseService();
+                    var existingHoles = await dbService.GetHolesForCourseAsync(course.Name);
+
+                    if (existingHoles != null && existingHoles.Count > 0)
+                    {
+                        // Grab the center coordinates from the first hole we have saved
+                        double centerLat = existingHoles.First().TeeLatitude;
+                        double centerLon = existingHoles.First().TeeLongitude;
+
+                        // 1. Wipe the old course data
+                        await dbService.DeleteCourseAsync(course.Name);
+
+                        // 2. Package it into a search result object so DownloadCourseDataAsync can use it
+                        var searchObj = new CourseSearchResult
+                        {
+                            Name = course.Name,
+                            Latitude = centerLat,
+                            Longitude = centerLon
+                        };
+
+                        // 3. Re-download fresh data from Overpass
+                        await DownloadCourseDataAsync(searchObj);
+                    }
+                    else
+                    {
+                        await DisplayAlert("Error", "Could not find reference coordinates for this course.", "OK");
+                    }
+
+                    CourseSearchBar.Text = string.Empty;
+                }
+            }
+        }
+
+        private async void OnDeleteCourse_Clicked(object sender, EventArgs e)
+        {
+            if (sender is Button btn && btn.CommandParameter is AutoCaddie.MainPage.CourseSearchResult course)
+            {
+                bool confirm = await DisplayAlert("Delete Course", $"Are you sure you want to remove {course.Name} and all its map data from your device?", "Yes, Delete", "Cancel");
+
+                if (confirm)
+                {
+                    var dbService = new AutoCaddie.Services.DatabaseService();
+                    await dbService.DeleteCourseAsync(course.Name);
+                    await LoadSavedCoursesFromDbAsync();
+                }
+            }
+        }
+
+
 
         // Fires when search is submitted
         private async void OnSearchButtonPressed(object sender, EventArgs e)
@@ -119,6 +198,29 @@ namespace AutoCaddie
             CourseSearchBar.Placeholder = "Search for a golf course...";
         }
 
+        private async void OnCourseCard_Tapped(object sender, EventArgs e)
+        {
+            // Cast the sender to a View and grab the data it is bound to
+            if (sender is View view && view.BindingContext is CourseSearchResult selectedCourse)
+            {
+                ResultsList.SelectedItem = null;
+
+                var dbService = new AutoCaddie.Services.DatabaseService();
+                var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
+
+                // 1. CACHE CHECK: If holes exist locally, skip API download entirely!
+                if (existingHoles != null && existingHoles.Count > 0)
+                {
+                    await Navigation.PushAsync(new CoursePage(selectedCourse.Name));
+                    return;
+                }
+
+                // 2. Otherwise download course data from API
+                await DisplayAlertAsync("Course Data", "Downloading {selectedCourse.Name}...", "OK");
+                await DownloadCourseDataAsync(selectedCourse);
+                CourseSearchBar.Text = string.Empty;
+            }
+        }
         // Fires when selecting a course from SEARCH RESULTS
         private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
         {
@@ -137,7 +239,8 @@ namespace AutoCaddie
                 }
 
                 // 2. Otherwise download course data from API
-                CourseSearchBar.Text = $"Downloading {selectedCourse.Name}...";
+                // CourseSearchBar.Text = $"Downloading {selectedCourse.Name}...";
+                await DisplayAlert($"Course Data", "Downloading {selectedCourse.Name}...", "OK");
                 await DownloadCourseDataAsync(selectedCourse);
                 CourseSearchBar.Text = string.Empty;
             }
@@ -263,30 +366,149 @@ namespace AutoCaddie
         //    }
         //}
 
+        //private async Task SaveDownloadedDataToDb(string courseName, OverpassResponse overpassData)
+        //{
+        //    if (overpassData?.elements == null) return;
+
+        //    var dbService = new AutoCaddie.Services.DatabaseService();
+
+        //    // We will still save the main GolfHole for backwards compatibility with your scorecard
+        //    // But we will also start saving the detailed map features
+        //    foreach (var element in overpassData.elements)
+        //    {
+        //        if (element.tags == null || element.geometry == null || element.geometry.Count == 0)
+        //            continue;
+
+        //        string golfTag = element.tags.GetValueOrDefault("golf", "").ToLower();
+        //        string naturalTag = element.tags.GetValueOrDefault("natural", "").ToLower();
+        //        string refTag = element.tags.GetValueOrDefault("ref", "0");
+
+        //        // Handle elements shared between holes (e.g. ref="2;3")
+        //        var associatedHoles = refTag.Split(';')
+        //                                    .Select(r => int.TryParse(r.Trim(), out int h) ? h : 0)
+        //                                    .ToList();
+
+        //        // Serialize the geometry list into a JSON string for SQLite storage
+        //        string jsonGeom = System.Text.Json.JsonSerializer.Serialize(element.geometry);
+
+        //        foreach (int holeNum in associatedHoles)
+        //        {
+        //            var feature = new AutoCaddie.Models.CourseMapFeature
+        //            {
+        //                CourseName = courseName,
+        //                HoleNumber = holeNum,
+        //                SerializedCoordinates = jsonGeom
+        //            };
+
+        //            // 1. Process Main Hole Line (For your Scorecard Par info)
+        //            if (golfTag == "hole")
+        //            {
+        //                feature.FeatureType = "HoleLine";
+
+        //                // Preserve your original GolfHole creation here so the UI doesn't break
+        //                var tee = element.geometry.First();
+        //                var green = element.geometry.Last();
+        //                int par = int.TryParse(element.tags.GetValueOrDefault("par"), out int p) ? p : 4;
+
+        //                var oldHoleModel = new AutoCaddie.Models.GolfHole
+        //                {
+        //                    CourseName = courseName,
+        //                    HoleNumber = holeNum,
+        //                    Par = par,
+        //                    TeeLatitude = tee.lat,
+        //                    TeeLongitude = tee.lon,
+        //                    GreenLatitude = green.lat,
+        //                    GreenLongitude = green.lon
+        //                };
+        //                await dbService.SaveHoleAsync(oldHoleModel);
+        //            }
+        //            // 2. Process Greens
+        //            else if (golfTag == "green")
+        //            {
+        //                feature.FeatureType = "Green";
+        //            }
+        //            // 3. Process Tees
+        //            else if (golfTag == "tee")
+        //            {
+        //                feature.FeatureType = "Tee";
+        //                feature.TeeColor = element.tags.GetValueOrDefault("colour", "white");
+        //            }
+        //            // 4. Process Fairways
+        //            else if (golfTag == "fairway")
+        //            {
+        //                feature.FeatureType = "Fairway";
+        //            }
+        //            // 5. Process Bunkers
+        //            else if (golfTag == "bunker")
+        //            {
+        //                feature.FeatureType = "Bunker";
+        //            }
+        //            // 6. Process Water
+        //            else if (golfTag == "water_hazard" || naturalTag == "water")
+        //            {
+        //                feature.FeatureType = "Water";
+        //            }
+        //            else
+        //            {
+        //                // Unrecognized tag, skip saving
+        //                continue;
+        //            }
+
+        //            // Save the newly categorized feature to the database
+        //            // (You will need to add SaveMapFeatureAsync to your DatabaseService)
+        //            await dbService.SaveMapFeatureAsync(feature);
+        //        }
+        //    }
+        //}
+
         private async Task SaveDownloadedDataToDb(string courseName, OverpassResponse overpassData)
         {
             if (overpassData?.elements == null) return;
 
             var dbService = new AutoCaddie.Services.DatabaseService();
 
-            // We will still save the main GolfHole for backwards compatibility with your scorecard
-            // But we will also start saving the detailed map features
             foreach (var element in overpassData.elements)
             {
-                if (element.tags == null || element.geometry == null || element.geometry.Count == 0)
+                if (element.tags == null)
+                    continue;
+
+                // 1. EXTRACT AND CONVERT DIRECTLY TO MAUI LOCATIONS
+                var activeGeometry = new List<Microsoft.Maui.Devices.Sensors.Location>();
+
+                // Standard ways
+                if (element.geometry != null)
+                {
+                    activeGeometry.AddRange(element.geometry.Select(g =>
+                        new Microsoft.Maui.Devices.Sensors.Location(g.lat, g.lon)));
+                }
+
+                // Multipolygon relations (Madisonville Fairways)
+                if (element.type == "relation" && element.members != null)
+                {
+                    foreach (var member in element.members.Where(m => m.role == "outer"))
+                    {
+                        if (member.geometry != null)
+                        {
+                            activeGeometry.AddRange(member.geometry.Select(g =>
+                                new Microsoft.Maui.Devices.Sensors.Location(g.lat, g.lon)));
+                        }
+                    }
+                }
+
+                // If it's still empty, skip it
+                if (activeGeometry.Count == 0)
                     continue;
 
                 string golfTag = element.tags.GetValueOrDefault("golf", "").ToLower();
                 string naturalTag = element.tags.GetValueOrDefault("natural", "").ToLower();
                 string refTag = element.tags.GetValueOrDefault("ref", "0");
 
-                // Handle elements shared between holes (e.g. ref="2;3")
                 var associatedHoles = refTag.Split(';')
                                             .Select(r => int.TryParse(r.Trim(), out int h) ? h : 0)
                                             .ToList();
 
-                // Serialize the geometry list into a JSON string for SQLite storage
-                string jsonGeom = System.Text.Json.JsonSerializer.Serialize(element.geometry);
+                // Serialize the native MAUI Locations!
+                string jsonGeom = System.Text.Json.JsonSerializer.Serialize(activeGeometry);
 
                 foreach (int holeNum in associatedHoles)
                 {
@@ -297,14 +519,12 @@ namespace AutoCaddie
                         SerializedCoordinates = jsonGeom
                     };
 
-                    // 1. Process Main Hole Line (For your Scorecard Par info)
                     if (golfTag == "hole")
                     {
                         feature.FeatureType = "HoleLine";
 
-                        // Preserve your original GolfHole creation here so the UI doesn't break
-                        var tee = element.geometry.First();
-                        var green = element.geometry.Last();
+                        var tee = activeGeometry.First();
+                        var green = activeGeometry.Last();
                         int par = int.TryParse(element.tags.GetValueOrDefault("par"), out int p) ? p : 4;
 
                         var oldHoleModel = new AutoCaddie.Models.GolfHole
@@ -312,47 +532,40 @@ namespace AutoCaddie
                             CourseName = courseName,
                             HoleNumber = holeNum,
                             Par = par,
-                            TeeLatitude = tee.lat,
-                            TeeLongitude = tee.lon,
-                            GreenLatitude = green.lat,
-                            GreenLongitude = green.lon
+                            // USE .Latitude and .Longitude now!
+                            TeeLatitude = tee.Latitude,
+                            TeeLongitude = tee.Longitude,
+                            GreenLatitude = green.Latitude,
+                            GreenLongitude = green.Longitude
                         };
                         await dbService.SaveHoleAsync(oldHoleModel);
                     }
-                    // 2. Process Greens
                     else if (golfTag == "green")
                     {
                         feature.FeatureType = "Green";
                     }
-                    // 3. Process Tees
                     else if (golfTag == "tee")
                     {
                         feature.FeatureType = "Tee";
                         feature.TeeColor = element.tags.GetValueOrDefault("colour", "white");
                     }
-                    // 4. Process Fairways
                     else if (golfTag == "fairway")
                     {
                         feature.FeatureType = "Fairway";
                     }
-                    // 5. Process Bunkers
                     else if (golfTag == "bunker")
                     {
                         feature.FeatureType = "Bunker";
                     }
-                    // 6. Process Water
                     else if (golfTag == "water_hazard" || naturalTag == "water")
                     {
                         feature.FeatureType = "Water";
                     }
                     else
                     {
-                        // Unrecognized tag, skip saving
                         continue;
                     }
 
-                    // Save the newly categorized feature to the database
-                    // (You will need to add SaveMapFeatureAsync to your DatabaseService)
                     await dbService.SaveMapFeatureAsync(feature);
                 }
             }
@@ -392,7 +605,10 @@ namespace AutoCaddie
             public double Latitude { get; set; }
             public double Longitude { get; set; }
             public bool IsFavorite { get; set; }
-            public string FavoriteIcon { get; set; } = "star_outline.png";
+
+            public Color StarFill => IsFavorite ? Color.FromArgb("#FFC107") : Colors.Transparent; // Gold when active, clear when empty
+            public Color StarStroke => IsFavorite ? Color.FromArgb("#FFA000") : Color.FromArgb("#7C4DFF"); // Deep gold or purple outline
+           // public string FavoriteIcon { get; set; } = "star_outline.png";
         }
 
         public class OverpassResponse
@@ -402,11 +618,19 @@ namespace AutoCaddie
 
         public class OverpassElement
         {
+            public string type { get; set; }
             public long id { get; set; }
             public Dictionary<string, string> tags { get; set; }
             public List<OverpassGeometry> geometry { get; set; }
+            public List<OverpassMember> members { get; set; }
         }
 
+        public class OverpassMember
+        {
+            public string type { get; set; }
+            public string role { get; set; } // This will hold "inner" or "outer"
+            public List<OverpassGeometry> geometry { get; set; }
+        }
         public class OverpassGeometry
         {
             public double lat { get; set; }
