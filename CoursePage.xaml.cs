@@ -17,6 +17,7 @@ public partial class CoursePage : ContentPage
     private bool _isTracking = false;
     private double _lastShotDistance = 0;
     private bool _isTrainingMode = true;
+    private bool _isPreviewMode;
 
     private Location _lastKnownLocation;
     private Location _lastAnnouncedLocation;
@@ -31,25 +32,39 @@ public partial class CoursePage : ContentPage
     private Dictionary<int, bool?> _roundFairways = new();
     private List<Location> _currentGreenPolygon = new();
 
-    public CoursePage(string courseName,string teeColor = null)
+    public CoursePage(string courseName, string teeColor = null, bool isPreviewMode = false)
     {
         InitializeComponent();
 
        // InjectFakeTestData(); // For testing purposes, remove in production
         _courseName = courseName;
-        _selectedTeeColor = teeColor; 
-
-        _announceTimer = Dispatcher.CreateTimer();
-        _announceTimer.Interval = TimeSpan.FromSeconds(5);
-        _announceTimer.Tick += OnAnnounceTimer_Tick;
+        _selectedTeeColor = teeColor;
+        _isPreviewMode = isPreviewMode;
+        ScoringPanel.IsVisible = !isPreviewMode;
+        YardageBadge.IsVisible = !isPreviewMode;
+        CaddieBadge.IsVisible = !isPreviewMode;
+        this.Title = _courseName;
+        MuteButton.IsVisible = !isPreviewMode;
+        
+        if (isPreviewMode)
+        {
+            this.ToolbarItems.Remove(FinishRoundButton);
+        }
 
         CourseMap.Loaded += async (s, e) =>
         {
             await LoadCourseData();
-            _myBag = await _dbService.GetMyBagAsync();
-            EvaluateTrainingMode();
-            await InitializeCaddieVoice();
-            await StartGpsTracking();
+            if (!_isPreviewMode)
+            {
+                
+                _announceTimer = Dispatcher.CreateTimer();
+                _announceTimer.Interval = TimeSpan.FromSeconds(5);
+                _announceTimer.Tick += OnAnnounceTimer_Tick;
+                _myBag = await _dbService.GetMyBagAsync();
+                EvaluateTrainingMode();
+                await InitializeCaddieVoice();
+                await StartGpsTracking();
+            }
         };
     }
 
@@ -824,9 +839,12 @@ public partial class CoursePage : ContentPage
         if (_holes.Count == 0) return;
         _currentIndex = (_currentIndex + 1) % _holes.Count;
 
-        _lastAnnouncedLocation = null;
-        _announceTimer.Stop();
-        _announceTimer.Start(); // NEW: Kickstart the tee-box announcement
+        if (!_isPreviewMode)
+        {
+            _lastAnnouncedLocation = null;
+            _announceTimer.Stop();
+            _announceTimer.Start(); // NEW: Kickstart the tee-box announcement
+        }
 
         await DisplayCurrentHoleAsync();
     }
@@ -836,9 +854,12 @@ public partial class CoursePage : ContentPage
         if (_holes.Count == 0) return;
         _currentIndex = (_currentIndex - 1 + _holes.Count) % _holes.Count;
 
-        _lastAnnouncedLocation = null;
-        _announceTimer.Stop();
-        _announceTimer.Start(); // NEW: Kickstart the tee-box announcement
+        if (!_isPreviewMode)
+        {
+            _lastAnnouncedLocation = null;
+            _announceTimer.Stop();
+            _announceTimer.Start(); // NEW: Kickstart the tee-box announcement
+        }
 
         await DisplayCurrentHoleAsync();
     }

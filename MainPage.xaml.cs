@@ -198,7 +198,57 @@ namespace AutoCaddie
             CourseSearchBar.Placeholder = "Search for a golf course...";
         }
 
-        
+
+
+        //private async Task OpenCourseAsync(CourseSearchResult course)
+        //{
+        //    if (course == null) return;
+
+        //    var dbService = new AutoCaddie.Services.DatabaseService();
+        //    var existingHoles = await dbService.GetHolesForCourseAsync(course.Name);
+
+        //    // 1. If it's a new course (not in local DB), show loading overlay and download
+        //    if (existingHoles == null || existingHoles.Count == 0)
+        //    {
+        //        LoadingText.Text = $"Downloading {course.Name}...";
+        //        LoadingOverlay.IsVisible = true;
+        //        DownloadSpinner.IsRunning = true;
+
+        //        try
+        //        {
+        //            await DownloadCourseDataAsync(course);
+        //            await LoadSavedCoursesFromDbAsync(); // Refresh the saved list UI
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
+        //            return;
+        //        }
+        //        finally
+        //        {
+        //            LoadingOverlay.IsVisible = false;
+        //            DownloadSpinner.IsRunning = false;
+        //            CourseSearchBar.Text = string.Empty;
+        //        }
+        //    }
+
+        //    // 2. Query available tees (works for both freshly downloaded and saved courses)
+        //    var availableTees = await dbService.GetAvailableTeesAsync(course.Name);
+        //    string selectedTeeColor = null;
+
+        //    if (availableTees != null && availableTees.Count > 0)
+        //    {
+        //        selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
+
+        //        if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
+        //        {
+        //            return;
+        //        }
+        //    }
+
+        //    // 3. Launch the course page once with the chosen configuration
+        //    await Navigation.PushAsync(new CoursePage(course.Name, selectedTeeColor));
+        //}
 
         private async Task OpenCourseAsync(CourseSearchResult course)
         {
@@ -207,7 +257,7 @@ namespace AutoCaddie
             var dbService = new AutoCaddie.Services.DatabaseService();
             var existingHoles = await dbService.GetHolesForCourseAsync(course.Name);
 
-            // 1. If it's a new course (not in local DB), show loading overlay and download
+            // 1. If it's a new course, show loading overlay and download
             if (existingHoles == null || existingHoles.Count == 0)
             {
                 LoadingText.Text = $"Downloading {course.Name}...";
@@ -217,11 +267,11 @@ namespace AutoCaddie
                 try
                 {
                     await DownloadCourseDataAsync(course);
-                    await LoadSavedCoursesFromDbAsync(); // Refresh the saved list UI
+                    await LoadSavedCoursesFromDbAsync();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
+                    await DisplayAlert("Download Failed", "There was an issue downloading the course map.", "OK");
                     return;
                 }
                 finally
@@ -232,22 +282,8 @@ namespace AutoCaddie
                 }
             }
 
-            // 2. Query available tees (works for both freshly downloaded and saved courses)
-            var availableTees = await dbService.GetAvailableTeesAsync(course.Name);
-            string selectedTeeColor = null;
-
-            if (availableTees != null && availableTees.Count > 0)
-            {
-                selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
-
-                if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
-                {
-                    return;
-                }
-            }
-
-            // 3. Launch the course page once with the chosen configuration
-            await Navigation.PushAsync(new CoursePage(course.Name, selectedTeeColor));
+            // 2. Simply launch the Hub!
+            await Navigation.PushAsync(new CourseDetailsPage(course.Name));
         }
         private async void OnCourseCard_Tapped(object sender, EventArgs e)
         {

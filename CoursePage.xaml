@@ -6,7 +6,7 @@
              Title="Active Round">
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Finish Round" Clicked="OnFinishRound_Clicked" Order="Primary" />
+        <ToolbarItem x:Name="FinishRoundButton" Text="Finish Round" Clicked="OnFinishRound_Clicked" Order="Primary" />
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="*, Auto">
@@ -18,32 +18,36 @@
         <VerticalStackLayout HorizontalOptions="Start" VerticalOptions="Start" Margin="15,20,0,0" Spacing="10">
 
             <!-- Floating FCB Yardage Badge -->
-            <Border BackgroundColor="#CC000000" StrokeThickness="0" Padding="15,10">
-                <Border.GestureRecognizers>
-                    <TapGestureRecognizer Tapped="OnYardageBadge_Tapped" />
-                </Border.GestureRecognizers>
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="15" />
-                </Border.StrokeShape>
-                <VerticalStackLayout HorizontalOptions="Center" Spacing="-2">
-                    <Label x:Name="BackYardageLabel" Text="-- B" TextColor="#A0A0A0" FontSize="14" FontAttributes="Bold" HorizontalOptions="Center" />
-                    <Label x:Name="YardageLabel" Text="-- YDS" TextColor="White" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" />
-                    <Label x:Name="FrontYardageLabel" Text="-- F" TextColor="#A0A0A0" FontSize="14" FontAttributes="Bold" HorizontalOptions="Center" />
-                </VerticalStackLayout>
-            </Border>
+            <Grid x:Name="YardageBadge">
+                <Border BackgroundColor="#CC000000" StrokeThickness="0" Padding="15,10">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnYardageBadge_Tapped" />
+                    </Border.GestureRecognizers>
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="15" />
+                    </Border.StrokeShape>
+                    <VerticalStackLayout HorizontalOptions="Center" Spacing="-2">
+                        <Label x:Name="BackYardageLabel" Text="-- B" TextColor="#A0A0A0" FontSize="14" FontAttributes="Bold" HorizontalOptions="Center" />
+                        <Label x:Name="YardageLabel" Text="-- YDS" TextColor="White" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" />
+                        <Label x:Name="FrontYardageLabel" Text="-- F" TextColor="#A0A0A0" FontSize="14" FontAttributes="Bold" HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
 
             <!-- Caddie Suggestion Badge -->
-            <Border BackgroundColor="#CC4A34D4" Padding="15,8" StrokeThickness="0">
+            <Grid x:Name="CaddieBadge">
+                <Border BackgroundColor="#CC4A34D4" Padding="15,8" StrokeThickness="0">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="10" />
                 </Border.StrokeShape>
                 <Label x:Name="SuggestionLabel" Text="Caddie: Calculating..." TextColor="White" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center"/>
-            </Border>
+                </Border>
+            </Grid>
 
         </VerticalStackLayout>
 
         <!-- Top Right Mute / Unmute Button Container -->
-        <Border HorizontalOptions="End" 
+        <Border x:Name="MuteButton" HorizontalOptions="End" 
                 VerticalOptions="Start" 
                 Margin="0,20,20,0"
                 BackgroundColor="#CC000000"
@@ -126,7 +130,7 @@
                 </Grid>
 
                 <!-- Score & Putt Tracker Grid -->
-                <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto, Auto, *" VerticalOptions="Center" RowSpacing="10">
+                <Grid x:Name ="ScoringPanel" RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto, Auto, *" VerticalOptions="Center" RowSpacing="10">
 
                     <!-- Row 0: Total Strokes -->
                     <Label Grid.Row="0" Grid.Column="1" Text="Strokes:" VerticalOptions="Center" FontSize="18" FontAttributes="Bold" TextColor="Black" Margin="0,0,15,0"/>
