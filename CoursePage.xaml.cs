@@ -104,7 +104,7 @@ public partial class CoursePage : ContentPage
         // If the hole is way longer than your furthest club, just hit the big stick
         if (targetYards >= longestClub.AverageYardage + 15)
         {
-            SuggestionLabel.Text = $"Caddie: Layup ({longestClub.Name})";
+            SuggestionLabel.Text = $"Caddie: ({longestClub.Name})";
             return;
         }
 

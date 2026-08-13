@@ -242,6 +242,31 @@
 
             </VerticalStackLayout>
         </ScrollView>
+        <!-- Loading Overlay (Sits on top of everything) -->
+        <Grid x:Name="LoadingOverlay" 
+              Grid.RowSpan="2" 
+              BackgroundColor="#99000000" 
+              IsVisible="False"
+              InputTransparent="False">
+            <!-- Prevents tapping things behind it -->
+
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="20">
+                <!-- Native Spinning Wheel -->
+                <ActivityIndicator x:Name="DownloadSpinner" 
+                                   IsRunning="False" 
+                                   Color="White" 
+                                   WidthRequest="50" 
+                                   HeightRequest="50" />
+
+                <!-- Dynamic Text -->
+                <Label x:Name="LoadingText" 
+                       Text="Downloading..." 
+                       TextColor="White" 
+                       FontSize="18" 
+                       FontAttributes="Bold" 
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
 
     </Grid>
 </ContentPage>
