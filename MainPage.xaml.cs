@@ -198,50 +198,129 @@ namespace AutoCaddie
             CourseSearchBar.Placeholder = "Search for a golf course...";
         }
 
-        private async void OnCourseCard_Tapped(object sender, EventArgs e)
+        
+
+        private async Task OpenCourseAsync(CourseSearchResult course)
         {
-            // Cast the sender to a View and grab the data it is bound to
-            if (sender is View view && view.BindingContext is CourseSearchResult selectedCourse)
+            if (course == null) return;
+
+            var dbService = new AutoCaddie.Services.DatabaseService();
+            var existingHoles = await dbService.GetHolesForCourseAsync(course.Name);
+
+            // 1. If it's a new course (not in local DB), show loading overlay and download
+            if (existingHoles == null || existingHoles.Count == 0)
             {
-                ResultsList.SelectedItem = null;
-
-                var dbService = new AutoCaddie.Services.DatabaseService();
-                var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
-
-                // 1. CACHE CHECK: If holes exist locally, skip API download entirely!
-                if (existingHoles != null && existingHoles.Count > 0)
-                {
-                    await Navigation.PushAsync(new CoursePage(selectedCourse.Name));
-                    return;
-                }
-
-                // 2. Otherwise download course data from API
-                LoadingText.Text = $"Downloading {selectedCourse.Name}...";
+                LoadingText.Text = $"Downloading {course.Name}...";
                 LoadingOverlay.IsVisible = true;
                 DownloadSpinner.IsRunning = true;
 
                 try
                 {
-                    // Execute the download
-                    await DownloadCourseDataAsync(selectedCourse);
-
-                    // Optional: Automatically navigate to the course page once it finishes successfully!
-                    // await Navigation.PushAsync(new CoursePage(selectedCourse.Name));
+                    await DownloadCourseDataAsync(course);
+                    await LoadSavedCoursesFromDbAsync(); // Refresh the saved list UI
                 }
                 catch (Exception ex)
                 {
-                    // If something goes wrong, tell the user
-                    await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please check your connection and try again.", "OK");
+                    await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
+                    return;
                 }
                 finally
                 {
-                    // This runs no matter what happens (success or crash), ensuring the UI unlocks
                     LoadingOverlay.IsVisible = false;
                     DownloadSpinner.IsRunning = false;
                     CourseSearchBar.Text = string.Empty;
                 }
             }
+
+            // 2. Query available tees (works for both freshly downloaded and saved courses)
+            var availableTees = await dbService.GetAvailableTeesAsync(course.Name);
+            string selectedTeeColor = null;
+
+            if (availableTees != null && availableTees.Count > 0)
+            {
+                selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
+
+                if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
+                {
+                    return;
+                }
+            }
+
+            // 3. Launch the course page once with the chosen configuration
+            await Navigation.PushAsync(new CoursePage(course.Name, selectedTeeColor));
         }
+        private async void OnCourseCard_Tapped(object sender, EventArgs e)
+        {
+            if (sender is View view && view.BindingContext is CourseSearchResult selectedCourse)
+            {
+                ResultsList.SelectedItem = null;
+                await OpenCourseAsync(selectedCourse);
+            }
+        }
+
+        private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.CurrentSelection.FirstOrDefault() is CourseSearchResult selectedCourse)
+            {
+                ResultsList.SelectedItem = null;
+                await OpenCourseAsync(selectedCourse);
+            }
+        }
+        //private async void OnCourseCard_Tapped(object sender, EventArgs e)
+        //{
+        //    // Cast the sender to a View and grab the data it is bound to
+        //    if (sender is View view && view.BindingContext is CourseSearchResult selectedCourse)
+        //    {
+        //        ResultsList.SelectedItem = null;
+
+        //        var dbService = new AutoCaddie.Services.DatabaseService();
+        //        var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
+
+        //        // 1. CACHE CHECK: If holes exist locally, skip API download and launch!
+        //        if (existingHoles != null && existingHoles.Count > 0)
+        //        {
+        //            var availableTees = await dbService.GetAvailableTeesAsync(selectedCourse.Name);
+        //            string selectedTeeColor = null;
+
+
+        //            // ONLY pop up the selection if the course actually has tee colors mapped
+        //            if (availableTees != null && availableTees.Count > 0)
+        //            {
+        //                selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
+
+        //                // If the user taps Cancel, abort the launch
+        //                if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
+        //                {
+        //                    return;
+        //                }
+        //            }
+
+        //            // Launch the course and pass the color to the constructor!
+        //            await Navigation.PushAsync(new CoursePage(selectedCourse.Name, selectedTeeColor));
+        //            return;
+        //        }
+
+        //        // 2. Otherwise download course data from API
+        //        LoadingText.Text = $"Downloading {selectedCourse.Name}...";
+        //        LoadingOverlay.IsVisible = true;
+        //        DownloadSpinner.IsRunning = true;
+
+        //        try
+        //        {
+        //            await DownloadCourseDataAsync(selectedCourse);
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please check your connection and try again.", "OK");
+        //        }
+        //        finally
+        //        {
+        //            LoadingOverlay.IsVisible = false;
+        //            DownloadSpinner.IsRunning = false;
+        //            CourseSearchBar.Text = string.Empty;
+        //        }
+        //    }
+        //}
         // Fires when selecting a course from SEARCH RESULTS
         //private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
         //{
@@ -266,55 +345,59 @@ namespace AutoCaddie
         //        CourseSearchBar.Text = string.Empty;
         //    }
         //}
-        private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
-        {
-            // Grab the course the user tapped
-            if (e.CurrentSelection.FirstOrDefault() is CourseSearchResult selectedCourse)
-            {
-                // 1. Instantly clear the orange selection highlight
-                ResultsList.SelectedItem = null;
+        //private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
+        //{
+        //    // Grab the course the user tapped
+        //    if (e.CurrentSelection.FirstOrDefault() is CourseSearchResult selectedCourse)
+        //    {
+        //        // 1. Instantly clear the selection highlight
+        //        ResultsList.SelectedItem = null;
 
-                // 2. Show the loading overlay
-                LoadingText.Text = $"Downloading {selectedCourse.Name}...";
-                LoadingOverlay.IsVisible = true;
-                DownloadSpinner.IsRunning = true;
+        //        // 2. Show the loading overlay
+        //        LoadingText.Text = $"Downloading {selectedCourse.Name}...";
+        //        LoadingOverlay.IsVisible = true;
+        //        DownloadSpinner.IsRunning = true;
 
-                try
-                {
-                    var dbService = new AutoCaddie.Services.DatabaseService();
-                    var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
+        //        try
+        //        {
+        //            var dbService = new AutoCaddie.Services.DatabaseService();
+        //            var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
 
-                    // CACHE CHECK: If holes exist locally, skip API download!
-                    if (existingHoles != null && existingHoles.Count > 0)
-                    {
-                        // await Navigation.PushAsync(new CoursePage(selectedCourse.Name));
-                        return;
-                    }
+        //            // CACHE CHECK: If holes exist locally, skip API download!
+        //            if (existingHoles == null || existingHoles.Count == 0)
+        //            {
+        //                // Execute the download only once if not already cached
+        //                await DownloadCourseDataAsync(selectedCourse);
+        //            }
 
-                    // 3. Otherwise, execute the download
-                    await DownloadCourseDataAsync(selectedCourse);
+        //            // Check for available tees after download/cache confirmation
+        //            var availableTees = await dbService.GetAvailableTeesAsync(selectedCourse.Name);
+        //            string selectedTeeColor = null;
 
-                    // Optional: Automatically navigate to the course page once it finishes!
-                    // await Navigation.PushAsync(new CoursePage(selectedCourse.Name));
-                }
-                catch (Exception ex)
-                {
-                    // If something goes wrong, tell the user
-                    await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
-                }
-                finally
-                {
-                    // 4. This runs no matter what happens, unlocking the UI
-                    LoadingOverlay.IsVisible = false;
-                    DownloadSpinner.IsRunning = false;
-                    CourseSearchBar.Text = string.Empty;
+        //            if (availableTees != null && availableTees.Count > 0)
+        //            {
+        //                selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
+        //                if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
+        //                {
+        //                    return;
+        //                }
+        //            }
 
-                    // Hide the search results list if desired
-                    // ResultsList.IsVisible = false;
-                    // SearchHeaderLabel.IsVisible = false;
-                }
-            }
-        }
+        //            // Launch the course page once
+        //            await Navigation.PushAsync(new CoursePage(selectedCourse.Name, selectedTeeColor));
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
+        //        }
+        //        finally
+        //        {
+        //            LoadingOverlay.IsVisible = false;
+        //            DownloadSpinner.IsRunning = false;
+        //            CourseSearchBar.Text = string.Empty;
+        //        }
+        //    }
+        //}
 
         // Fires when selecting a course from MY COURSES(Local Database)
         private async void OnSavedCourseSelected(object sender, SelectionChangedEventArgs e)
@@ -395,7 +478,7 @@ namespace AutoCaddie
                 {
                     await SaveDownloadedDataToDb(course.Name, overpassData);
                     await LoadSavedCoursesFromDbAsync();
-                    await Navigation.PushAsync(new CoursePage(course.Name));
+                   // await Navigation.PushAsync(new CoursePage(course.Name));
                 }
                 else
                 {
@@ -501,7 +584,7 @@ namespace AutoCaddie
                     else if (golfTag == "tee")
                     {
                         feature.FeatureType = "Tee";
-                        feature.TeeColor = element.tags.GetValueOrDefault("colour", "white");
+                        feature.TeeColor = element.tags.GetValueOrDefault("colour", null);
                     }
                     // 4. Process Fairways
                     else if (golfTag == "fairway")

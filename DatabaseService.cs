@@ -103,10 +103,15 @@ public class DatabaseService
 
         // We also pull features where HoleNumber == 0 in case we saved a giant 
         // lake or river that applies to the whole course!
+        //return await _db.Table<AutoCaddie.Models.CourseMapFeature>()
+        //                .Where(f => f.CourseName == courseName &&
+        //                      (f.HoleNumber == holeNumber || f.HoleNumber == 0))
+        //                .ToListAsync();
         return await _db.Table<AutoCaddie.Models.CourseMapFeature>()
-                        .Where(f => f.CourseName == courseName &&
-                              (f.HoleNumber == holeNumber || f.HoleNumber == 0))
-                        .ToListAsync();
+                    .Where(f => f.CourseName == courseName &&
+                          (f.HoleNumber == holeNumber ||
+                          (f.HoleNumber == 0 && f.FeatureType != "Tee" && f.FeatureType != "Green")))
+                    .ToListAsync();
     }
     public async Task<List<GolfHole>> GetHolesForCourseAsync(string courseName)
     {
@@ -273,26 +278,24 @@ public class DatabaseService
         }
     }
 
-    public async Task RenameCourseAsync(string oldName, string newName)
+    public async Task<List<string>> GetAvailableTeesAsync(string courseName)
     {
-        await Init();
+        await Init(); // Ensure DB is initialized
 
-        // 1. Update holes
-        var holes = await _db.Table<GolfHole>().Where(h => h.CourseName == oldName).ToListAsync();
-        foreach (var hole in holes)
-        {
-            hole.CourseName = newName;
-            await _db.UpdateAsync(hole);
-        }
+        // Grab all features for this course that are tagged as "Tee"
+        var tees = await _db.Table<AutoCaddie.Models.CourseMapFeature>()
+                            .Where(f => f.CourseName == courseName && f.FeatureType == "Tee")
+                            .ToListAsync();
 
-        // 2. Update map features
-        var features = await _db.Table<CourseMapFeature>().Where(f => f.CourseName == oldName).ToListAsync();
-        foreach (var feature in features)
-        {
-            feature.CourseName = newName;
-            await _db.UpdateAsync(feature);
-        }
+        // Extract the colors, remove duplicates, and capitalize them nicely
+        var distinctColors = tees.Select(t => t.TeeColor?.ToUpper())
+                                 .Where(c => !string.IsNullOrEmpty(c))
+                                 .Distinct()
+                                 .ToList();
+
+        return distinctColors;
     }
+
 
 
 }

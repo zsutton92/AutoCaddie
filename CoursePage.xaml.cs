@@ -10,6 +10,7 @@ namespace AutoCaddie;
 public partial class CoursePage : ContentPage
 {
     private string _courseName;
+    private string _selectedTeeColor;
     private DatabaseService _dbService = new();
     private List<GolfHole> _holes = new();
     private int _currentIndex = 0;
@@ -30,12 +31,13 @@ public partial class CoursePage : ContentPage
     private Dictionary<int, bool?> _roundFairways = new();
     private List<Location> _currentGreenPolygon = new();
 
-    public CoursePage(string courseName)
+    public CoursePage(string courseName,string teeColor = null)
     {
         InitializeComponent();
 
        // InjectFakeTestData(); // For testing purposes, remove in production
         _courseName = courseName;
+        _selectedTeeColor = teeColor; 
 
         _announceTimer = Dispatcher.CreateTimer();
         _announceTimer.Interval = TimeSpan.FromSeconds(5);
@@ -448,11 +450,40 @@ public partial class CoursePage : ContentPage
             _currentGreenPolygon.Clear();
         }
 
-        double midLat = (currentHole.TeeLatitude + currentHole.GreenLatitude) / 2;
-        double midLon = (currentHole.TeeLongitude + currentHole.GreenLongitude) / 2;
-        double bearing = CalculateBearing(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
+        //double midLat = (currentHole.TeeLatitude + currentHole.GreenLatitude) / 2;
+        //double midLon = (currentHole.TeeLongitude + currentHole.GreenLongitude) / 2;
+        //double bearing = CalculateBearing(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
 
-        double distanceMeters = Location.CalculateDistance(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
+        //double distanceMeters = Location.CalculateDistance(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
+        //if (distanceMeters < 50) distanceMeters = 50;
+
+        // --- NEW: TEE BOX LOGIC ---
+        // 1. Set default fallback coordinates (the main hole line)
+        double activeTeeLat = currentHole.TeeLatitude;
+        double activeTeeLon = currentHole.TeeLongitude;
+
+        if (!string.IsNullOrEmpty(_selectedTeeColor))
+        {
+            // 2. Search for the specific tee color the user selected
+            var teeFeature = holeFeatures.FirstOrDefault(f => f.FeatureType == "Tee" && f.TeeColor?.ToLower() == _selectedTeeColor.ToLower());
+            if (teeFeature != null && !string.IsNullOrEmpty(teeFeature.SerializedCoordinates))
+            {
+                var rawTeeNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(teeFeature.SerializedCoordinates);
+                if (rawTeeNodes != null && rawTeeNodes.Count > 0)
+                {
+                    // Grab the actual coordinates for this specific tee box
+                    activeTeeLat = rawTeeNodes.First().lat;
+                    activeTeeLon = rawTeeNodes.First().lon;
+                }
+            }
+        }
+
+        // 3. Calculate map framing using the ACTIVE tee coordinates
+        double midLat = (activeTeeLat + currentHole.GreenLatitude) / 2;
+        double midLon = (activeTeeLon + currentHole.GreenLongitude) / 2;
+        double bearing = CalculateBearing(activeTeeLat, activeTeeLon, currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+        double distanceMeters = Location.CalculateDistance(activeTeeLat, activeTeeLon, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
         if (distanceMeters < 50) distanceMeters = 50;
 
         Dispatcher.Dispatch(() =>
@@ -517,7 +548,8 @@ public partial class CoursePage : ContentPage
                 googleMap.UiSettings.CompassEnabled = false;
                 googleMap.UiSettings.MapToolbarEnabled = false;
 
-                var teePoint = new Android.Gms.Maps.Model.LatLng(currentHole.TeeLatitude, currentHole.TeeLongitude);
+                // var teePoint = new Android.Gms.Maps.Model.LatLng(currentHole.TeeLatitude, currentHole.TeeLongitude);
+                var teePoint = new Android.Gms.Maps.Model.LatLng(activeTeeLat, activeTeeLon);
                 var greenPoint = new Android.Gms.Maps.Model.LatLng(currentHole.GreenLatitude, currentHole.GreenLongitude);
 
                 var context = Android.App.Application.Context;
