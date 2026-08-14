@@ -75,6 +75,7 @@
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="-2">
                         <Label x:Name="BackYardageLabel" Text="-- B" TextColor="#A0A0A0" FontSize="12" FontAttributes="Bold" HorizontalOptions="Center" />
                         <Label x:Name="YardageLabel" Text="-- YDS" TextColor="White" FontSize="26" FontAttributes="Bold" HorizontalOptions="Center" />
+                        <Label x:Name="PlaysLikeLabel" Text="Plays --" TextColor="#FFD700" FontSize="15" FontAttributes="Bold" HorizontalOptions="Center" Margin="0,2,0,0"/>
                         <Label x:Name="FrontYardageLabel" Text="-- F" TextColor="#A0A0A0" FontSize="12" FontAttributes="Bold" HorizontalOptions="Center" />
                     </VerticalStackLayout>
                 </Border>

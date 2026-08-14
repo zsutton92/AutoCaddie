@@ -238,9 +238,12 @@ public partial class CoursePage : ContentPage
                 caddieCompliment = solidShots[rnd.Next(solidShots.Length)] + " ";
             }
 
-            string yardageSpeech = YardageLabel.Text.Replace("YDS", "yards to the center. ");
+            //string yardageSpeech = YardageLabel.Text.Replace("YDS", "yards to the center. ");
+            string yardageSpeech = $"{_currentCenterYards} yards. Playing like {PlaysLikeLabel.Text.Replace("Plays ", "")}. ";
             string caddieSpeech = GetSpokenCaddieSuggestion();
 
+            // string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
+            // Example: "Great shot! 145 yards. Playing like 152. Stroke 2. I suggest 8 iron."
             string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
 
             if (_caddieVoice != null)
@@ -603,13 +606,35 @@ public partial class CoursePage : ContentPage
             frontYards = Math.Max(0, centerYards - 15);
         }
 
+        // --- NEW: PLAYS LIKE MATH (WIND) ---
+
+        // 1. Calculate the bearing from the USER to the GREEN 
+        // (This ensures the wind math is accurate even if you hit your drive two fairways over)
+        double userToGreenBearing = CalculateBearing(myLocation.Latitude, myLocation.Longitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+        // 2. Determine where the wind is blowing TO
+        double windBlowingTo = (_courseWeather.WindDirectionDegrees + 180) % 360;
+
+        // 3. Calculate the relative angle of the wind to your specific shot line
+        double relativeWindAngle = (windBlowingTo - userToGreenBearing + 360) % 360;
+
+        // 4. Calculate effective wind using Trigonometry (Cos(angle) * speed).
+        // Tailwind (0 deg) = Cos(0) = 1. Headwind (180 deg) = Cos(180) = -1. Crosswind (90 deg) = Cos(90) = 0.
+        double effectiveWindMph = Math.Cos(relativeWindAngle * (Math.PI / 180.0)) * _courseWeather.WindSpeedMph;
+
+        // 5. Golf Rule of Thumb: 1 mph of direct wind = ~1 yard of impact.
+        // Since effectiveWindMph is positive for a tailwind, we SUBTRACT it to get the playing distance.
+        double playsLikeYards = Math.Round(centerYards - effectiveWindMph);
+
         Dispatcher.Dispatch(() =>
         {
             BackYardageLabel.Text = $"{backYards} B";
             YardageLabel.Text = $"{centerYards} YDS";
             FrontYardageLabel.Text = $"{frontYards} F";
+            PlaysLikeLabel.Text = $"Plays {playsLikeYards}";
 
-            UpdateClubSuggestion(centerYards);
+            //UpdateClubSuggestion(centerYards);
+            UpdateClubSuggestion(playsLikeYards);
         });
     }
 
