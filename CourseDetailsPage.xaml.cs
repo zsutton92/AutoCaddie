@@ -80,7 +80,7 @@ public partial class CourseDetailsPage : ContentPage
 
     private async void OnStartRound_Clicked(object sender, EventArgs e)
     {
-        // Prompt for tees exactly like we used to do on the MainPage
+        // Prompt for tees 
         var availableTees = await _dbService.GetAvailableTeesAsync(_courseName);
         string selectedTeeColor = null;
 

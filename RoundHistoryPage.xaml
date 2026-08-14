@@ -2,42 +2,70 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AutoCaddie.RoundHistoryPage"
-             Title="My Rounds">
+             Title="My Rounds"
+             BackgroundColor="{AppThemeBinding Light=#F8F9FA, Dark=#121212}">
 
-    <CollectionView x:Name="HistoryList" SelectionMode="Single" SelectionChanged="OnRoundSelected" Margin="10">
+    <CollectionView x:Name="HistoryList" 
+                    SelectionMode="Single" 
+                    SelectionChanged="OnRoundSelected" 
+                    Margin="10">
         <CollectionView.ItemTemplate>
             <DataTemplate>
-                <Border Margin="0,5" Padding="15" StrokeThickness="0" BackgroundColor="White">
+                <!-- Adaptive Card Background -->
+                <Border Margin="0,5" 
+                        Padding="15" 
+                        StrokeThickness="0" 
+                        BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
                     <Border.StrokeShape>
                         <RoundRectangle CornerRadius="10" />
                     </Border.StrokeShape>
                     <Border.Shadow>
-                        <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.1" />
+                        <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="{AppThemeBinding Light=0.08, Dark=0.3}" />
                     </Border.Shadow>
 
                     <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
                         <!-- Row 0: Course Name & Date -->
                         <VerticalStackLayout Grid.Row="0" Grid.Column="0" VerticalOptions="Center">
-                            <Label Text="{Binding CourseName}" FontSize="18" FontAttributes="Bold" />
-                            <Label Text="{Binding DatePlayed, StringFormat='{0:MMM dd, yyyy}'}" FontSize="14" TextColor="Gray" />
+                            <Label Text="{Binding CourseName}" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold" 
+                                   TextColor="{AppThemeBinding Light=#222222, Dark=#F0F0F0}" />
+                            <Label Text="{Binding DatePlayed, StringFormat='{0:MMM dd, yyyy}'}" 
+                                   FontSize="14" 
+                                   TextColor="{AppThemeBinding Light=#666666, Dark=#AAAAAA}" />
                         </VerticalStackLayout>
 
                         <!-- Row 0: Total Score -->
                         <VerticalStackLayout Grid.Row="0" Grid.Column="1" HorizontalOptions="End" VerticalOptions="Center">
-                            <Label Text="SCORE" FontSize="10" TextColor="Gray" HorizontalTextAlignment="End" />
-                            <Label Text="{Binding TotalScore}" FontSize="24" FontAttributes="Bold" HorizontalTextAlignment="End"/>
+                            <Label Text="SCORE" 
+                                   FontSize="10" 
+                                   TextColor="{AppThemeBinding Light=#888888, Dark=#999999}" 
+                                   HorizontalTextAlignment="End" />
+                            <Label Text="{Binding TotalScore}" 
+                                   FontSize="24" 
+                                   FontAttributes="Bold" 
+                                   TextColor="{AppThemeBinding Light=#111111, Dark=White}" 
+                                   HorizontalTextAlignment="End"/>
                         </VerticalStackLayout>
 
-                        <!-- Row 1: The New Stats Row -->
+                        <!-- Row 1: The Stats Row -->
                         <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="15" Margin="0,10,0,0">
-                            <Label Text="{Binding TotalGIR, StringFormat='GIR: {0}'}" FontSize="12" TextColor="#4A34D4" FontAttributes="Bold" />
-                            <Label Text="{Binding TotalFIR, StringFormat='FIR: {0}'}" FontSize="12" TextColor="#4A34D4" FontAttributes="Bold" />
-                            <Label Text="{Binding TotalPutts, StringFormat='Putts: {0}'}" FontSize="12" TextColor="#4A34D4" FontAttributes="Bold" />
+                            <Label Text="{Binding TotalGIR, StringFormat='GIR: {0}'}" 
+                                   FontSize="12" 
+                                   TextColor="{AppThemeBinding Light=#4A34D4, Dark=#9B84EC}" 
+                                   FontAttributes="Bold" />
+                            <Label Text="{Binding TotalFIR, StringFormat='FIR: {0}'}" 
+                                   FontSize="12" 
+                                   TextColor="{AppThemeBinding Light=#4A34D4, Dark=#9B84EC}" 
+                                   FontAttributes="Bold" />
+                            <Label Text="{Binding TotalPutts, StringFormat='Putts: {0}'}" 
+                                   FontSize="12" 
+                                   TextColor="{AppThemeBinding Light=#4A34D4, Dark=#9B84EC}" 
+                                   FontAttributes="Bold" />
                         </HorizontalStackLayout>
                     </Grid>
                 </Border>
             </DataTemplate>
         </CollectionView.ItemTemplate>
     </CollectionView>
-
 </ContentPage>

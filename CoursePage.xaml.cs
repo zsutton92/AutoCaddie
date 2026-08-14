@@ -9,28 +9,35 @@ namespace AutoCaddie;
 
 public partial class CoursePage : ContentPage
 {
-    private string _courseName;
-    private string _selectedTeeColor;
     private DatabaseService _dbService = new();
-    private List<GolfHole> _holes = new();
-    private int _currentIndex = 0;
-    private bool _isTracking = false;
-    private double _lastShotDistance = 0;
-    private bool _isTrainingMode = true;
-    private bool _isPreviewMode;
-
     private Location _lastKnownLocation;
     private Location _lastAnnouncedLocation;
-    private IDispatcherTimer _announceTimer;
-    private bool _isMuted = false;
-    private Dictionary<int, int> _roundScores = new();
-    private double _pendingShotDistance = 0;
+    private List<GolfHole> _holes = new();
+    private List<Location> _currentGreenPolygon = new();
     private List<GolfClub> _myBag = new();
-    private SpeechOptions _caddieVoice;
-    private double _currentCenterYards = 0;
+    private Dictionary<int, int> _roundScores = new();
     private Dictionary<int, int> _roundPutts = new();
     private Dictionary<int, bool?> _roundFairways = new();
-    private List<Location> _currentGreenPolygon = new();
+
+    private string _courseName;
+    private string _selectedTeeColor;
+
+    private bool _isTrainingMode = true;
+    private bool _isPreviewMode;
+    private bool _isTracking = false;
+    private bool _isMuted = false;
+
+    private int _currentIndex = 0;
+    
+    private double _lastShotDistance = 0;
+    private double _pendingShotDistance = 0;
+    private double _currentCenterYards = 0;
+
+
+    private IDispatcherTimer _announceTimer; 
+    private SpeechOptions _caddieVoice;
+   
+ 
 
     public CoursePage(string courseName, string teeColor = null, bool isPreviewMode = false)
     {
@@ -165,27 +172,7 @@ public partial class CoursePage : ContentPage
                 {
                     _roundScores[currentHole.HoleNumber]++;
 
-                    await EvaluateFIRAsync(currentHole);
-
-                    //// 1. Determine if this was a tee shot on a Par 4 or 5
-                    //if (_roundScores[currentHole.HoleNumber] == 2 && currentHole.Par > 3)
-                    //{
-                    //    // 2. Fetch the fairway polygon for this hole from SQLite
-                    //    var holeFeatures = await _dbService.GetMapFeaturesForHoleAsync(_courseName, currentHole.HoleNumber);
-                    //    var fairwayFeature = holeFeatures.FirstOrDefault(f => f.FeatureType == "Fairway");
-
-                    //    if (fairwayFeature != null)
-                    //    {
-                    //        // Deserialize the JSON string back into a list of Location objects
-                    //        var fairwayNodes = System.Text.Json.JsonSerializer.Deserialize<List<Location>>(fairwayFeature.SerializedCoordinates);
-
-                    //        // 3. Run the Ray-Casting algorithm using your current location (where the tee shot landed)
-                    //        bool hitFairway = IsPointInPolygon(_lastKnownLocation, fairwayNodes);
-
-                    //        // Save the result
-                    //        _roundFairways[currentHole.HoleNumber] = hitFairway;
-                    //    }
-                    //}
+                    await EvaluateFIRAsync(currentHole);                    
 
                     // Safely update the UI thread
                     Dispatcher.Dispatch(() =>
@@ -256,8 +243,7 @@ public partial class CoursePage : ContentPage
                          .ToList();
 
         if (_holes.Count > 0)
-        {
-            // Call our async display method
+        {            
             await DisplayCurrentHoleAsync();
         }
         else
@@ -305,114 +291,7 @@ public partial class CoursePage : ContentPage
         if (zoom < 14f) zoom = 14f;
 
         return (float)zoom;
-    }
-
-    //    private async Task DisplayCurrentHoleAsync()
-    //    {
-    //        if (_holes.Count == 0) return;
-
-    //        var currentHole = _holes[_currentIndex];
-
-    //        HoleTitleLabel.Text = $"Hole {currentHole.HoleNumber}";
-    //        ParLabel.Text = $"Par {currentHole.Par}";
-
-    //        if (!_roundScores.ContainsKey(currentHole.HoleNumber))
-    //        {
-    //            _roundScores[currentHole.HoleNumber] = 1;
-    //        }
-
-    //        if (!_roundPutts.ContainsKey(currentHole.HoleNumber))
-    //        {
-    //            _roundPutts[currentHole.HoleNumber] = 0;
-    //        }
-
-    //        // Update the new UI Label
-    //        PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
-
-    //        // Update the UI Label
-    //        ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
-
-    //        if (_lastKnownLocation != null)
-    //        {
-    //            UpdateYardages(_lastKnownLocation);
-    //        }
-    //        else
-    //        {
-    //            // Reset to dashes if GPS hasn't found us yet
-    //            Dispatcher.Dispatch(() =>
-    //            {
-    //                BackYardageLabel.Text = "-- B";
-    //                YardageLabel.Text = "-- YDS";
-    //                FrontYardageLabel.Text = "-- F";
-    //            });
-    //        }
-
-    //        CourseMap.Pins.Clear();
-
-
-
-    //        double midLat = (currentHole.TeeLatitude + currentHole.GreenLatitude) / 2;
-    //        double midLon = (currentHole.TeeLongitude + currentHole.GreenLongitude) / 2;
-    //        double bearing = CalculateBearing(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
-
-    //        double distanceMeters = Location.CalculateDistance(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
-    //        if (distanceMeters < 50) distanceMeters = 50;
-
-    //        Dispatcher.Dispatch(() =>
-    //        {
-    //#if ANDROID
-    //            var mapHandler = CourseMap.Handler as Microsoft.Maui.Maps.Handlers.MapHandler;
-    //            if (mapHandler?.Map is Android.Gms.Maps.GoogleMap googleMap)
-    //            {
-    //                googleMap.Clear();
-
-    //                googleMap.UiSettings.MyLocationButtonEnabled = false;
-    //                googleMap.UiSettings.ZoomControlsEnabled = false;
-    //                googleMap.UiSettings.CompassEnabled = false;
-    //                googleMap.UiSettings.MapToolbarEnabled = false;
-
-    //                var teePoint = new Android.Gms.Maps.Model.LatLng(currentHole.TeeLatitude, currentHole.TeeLongitude);
-    //                var greenPoint = new Android.Gms.Maps.Model.LatLng(currentHole.GreenLatitude, currentHole.GreenLongitude);
-
-    //                var context = Android.App.Application.Context;
-
-    //                // 1. Calculate the zoom using MAUI's raw Height property (already in DP)
-    //                float perfectZoom = CalculatePerfectZoom(midLat, distanceMeters, CourseMap.Height);
-
-    //                // 2. Package the Target, Zoom, and Bearing into ONE seamless instruction
-    //                var cinematicCamera = new Android.Gms.Maps.Model.CameraPosition.Builder()
-    //                    .Target(new Android.Gms.Maps.Model.LatLng(midLat, midLon))
-    //                    .Zoom(perfectZoom)
-    //                    .Bearing((float)bearing)
-    //                    .Build();
-
-    //                // 3. Smooth animation
-    //                googleMap.AnimateCamera(Android.Gms.Maps.CameraUpdateFactory.NewCameraPosition(cinematicCamera));
-
-    //                int teeId = context.Resources.GetIdentifier("tee", "drawable", context.PackageName);
-    //                var teeOptions = new Android.Gms.Maps.Model.MarkerOptions()
-    //                    .SetPosition(teePoint)
-    //                    .SetTitle("Tee")
-    //                    .Anchor(0.5f, 0.5f);
-
-    //                if (teeId != 0) teeOptions.SetIcon(Android.Gms.Maps.Model.BitmapDescriptorFactory.FromResource(teeId));
-    //                googleMap.AddMarker(teeOptions);
-
-    //                int flagId = context.Resources.GetIdentifier("flag", "drawable", context.PackageName);
-    //                var flagOptions = new Android.Gms.Maps.Model.MarkerOptions()
-    //                    .SetPosition(greenPoint)
-    //                    .SetTitle("Green")
-    //                    .Anchor(0.5f, 1.0f);
-
-    //                if (flagId != 0) flagOptions.SetIcon(Android.Gms.Maps.Model.BitmapDescriptorFactory.FromResource(flagId));
-    //                googleMap.AddMarker(flagOptions);
-    //            }
-    //#else
-    //            var centerPosition = new Location(midLat, midLon);
-    //            CourseMap.MoveToRegion(MapSpan.FromCenterAndRadius(centerPosition, Distance.FromMeters(250)));
-    //#endif
-    //        });
-    //    }
+    }   
 
     private async Task DisplayCurrentHoleAsync()
     {
@@ -464,13 +343,7 @@ public partial class CoursePage : ContentPage
         {
             _currentGreenPolygon.Clear();
         }
-
-        //double midLat = (currentHole.TeeLatitude + currentHole.GreenLatitude) / 2;
-        //double midLon = (currentHole.TeeLongitude + currentHole.GreenLongitude) / 2;
-        //double bearing = CalculateBearing(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
-
-        //double distanceMeters = Location.CalculateDistance(currentHole.TeeLatitude, currentHole.TeeLongitude, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
-        //if (distanceMeters < 50) distanceMeters = 50;
+       
 
         // --- NEW: TEE BOX LOGIC ---
         // 1. Set default fallback coordinates (the main hole line)
@@ -562,8 +435,7 @@ public partial class CoursePage : ContentPage
                 googleMap.UiSettings.ZoomControlsEnabled = false;
                 googleMap.UiSettings.CompassEnabled = false;
                 googleMap.UiSettings.MapToolbarEnabled = false;
-
-                // var teePoint = new Android.Gms.Maps.Model.LatLng(currentHole.TeeLatitude, currentHole.TeeLongitude);
+            
                 var teePoint = new Android.Gms.Maps.Model.LatLng(activeTeeLat, activeTeeLon);
                 var greenPoint = new Android.Gms.Maps.Model.LatLng(currentHole.GreenLatitude, currentHole.GreenLongitude);
 
@@ -662,64 +534,7 @@ public partial class CoursePage : ContentPage
 
         return $", I suggest {club}.";
     }
-
-    //private void Geolocation_LocationChanged(object sender, GeolocationLocationChangedEventArgs e)
-    //{
-    //    if (_holes.Count == 0) return;
-
-    //    var currentHole = _holes[_currentIndex];
-    //    var myLocation = e.Location;
-
-    //    // 1. Calculate physical distance from your phone to the Center of the Green
-    //    double distanceMeters = Location.CalculateDistance(
-    //        myLocation.Latitude, myLocation.Longitude,
-    //        currentHole.GreenLatitude, currentHole.GreenLongitude,
-    //        DistanceUnits.Kilometers) * 1000.0;
-
-    //    // 2. Convert meters to Yards and round it to a clean whole number
-    //    double centerYards = Math.Round(distanceMeters * 1.09361);
-
-    //    // 3. Apply the 15-yard Front/Back smartwatch estimation
-    //    double backYards = centerYards + 15;
-    //    double frontYards = Math.Max(0, centerYards - 15); // Prevents negative yards if standing on the green
-
-    //    // 4. Update the UI
-    //    Dispatcher.Dispatch(() =>
-    //    {
-    //        BackYardageLabel.Text = $"{backYards} B";
-    //        YardageLabel.Text = $"{centerYards} YDS";
-    //        FrontYardageLabel.Text = $"{frontYards} F";
-    //    });
-    //}
-
-    // NEW METHOD: Reusable yardage calculator
-    //private void UpdateYardages(Location myLocation)
-    //{
-    //    if (_holes.Count == 0 || myLocation == null) return;
-
-    //    var currentHole = _holes[_currentIndex];
-
-    //    double distanceMeters = Location.CalculateDistance(
-    //        myLocation.Latitude, myLocation.Longitude,
-    //        currentHole.GreenLatitude, currentHole.GreenLongitude,
-    //        DistanceUnits.Kilometers) * 1000.0;
-
-    //    double centerYards = Math.Round(distanceMeters * 1.09361);
-    //    _currentCenterYards = centerYards;
-
-    //    double backYards = centerYards + 15;
-    //    double frontYards = Math.Max(0, centerYards - 15);
-
-    //    Dispatcher.Dispatch(() =>
-    //    {
-    //        BackYardageLabel.Text = $"{backYards} B";
-    //        YardageLabel.Text = $"{centerYards} YDS";
-    //        FrontYardageLabel.Text = $"{frontYards} F";
-
-    //        UpdateClubSuggestion(centerYards);
-    //    });
-    //}
-
+    
     private void UpdateYardages(Location myLocation)
     {
         if (_holes.Count == 0 || myLocation == null) return;
@@ -778,12 +593,7 @@ public partial class CoursePage : ContentPage
             UpdateClubSuggestion(centerYards);
         });
     }
-    // UPDATED METHOD: Just saves the location and triggers the math
-    //private void Geolocation_LocationChanged(object sender, GeolocationLocationChangedEventArgs e)
-    //{
-    //    _lastKnownLocation = e.Location;
-    //    UpdateYardages(_lastKnownLocation);
-    //}
+ 
 
     private void Geolocation_LocationChanged(object sender, GeolocationLocationChangedEventArgs e)
     {
@@ -819,20 +629,7 @@ public partial class CoursePage : ContentPage
             }
         }
     }
-
-    //private async void OnNextHole_Clicked(object sender, EventArgs e)
-    //{
-    //    if (_holes.Count == 0) return;
-    //    _currentIndex = (_currentIndex + 1) % _holes.Count;
-    //    await DisplayCurrentHoleAsync();
-    //}
-
-    //private async void OnPrevHole_Clicked(object sender, EventArgs e)
-    //{
-    //    if (_holes.Count == 0) return;
-    //    _currentIndex = (_currentIndex - 1 + _holes.Count) % _holes.Count;
-    //    await DisplayCurrentHoleAsync();
-    //}
+    
 
     private async void OnNextHole_Clicked(object sender, EventArgs e)
     {
@@ -983,7 +780,7 @@ public partial class CoursePage : ContentPage
         if (_holes.Count == 0) return;
         var currentHole = _holes[_currentIndex];
 
-        // Cap putts at a reasonable max (hopefully you never need more than 5!)
+        
         if (_roundPutts[currentHole.HoleNumber] < 10)
         {
             _roundPutts[currentHole.HoleNumber]++;
@@ -1077,7 +874,7 @@ public partial class CoursePage : ContentPage
             if (club.Name == "9i") club.TotalYardage = 125 * 5;
             if (club.Name == "PW") club.TotalYardage = 110 * 5;
 
-            // You can leave the rest blank, the engine will just ignore clubs with 0 yards
+           
         }
 
         // Save them to memory

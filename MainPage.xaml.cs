@@ -197,58 +197,7 @@ namespace AutoCaddie
 
             CourseSearchBar.Placeholder = "Search for a golf course...";
         }
-
-
-
-        //private async Task OpenCourseAsync(CourseSearchResult course)
-        //{
-        //    if (course == null) return;
-
-        //    var dbService = new AutoCaddie.Services.DatabaseService();
-        //    var existingHoles = await dbService.GetHolesForCourseAsync(course.Name);
-
-        //    // 1. If it's a new course (not in local DB), show loading overlay and download
-        //    if (existingHoles == null || existingHoles.Count == 0)
-        //    {
-        //        LoadingText.Text = $"Downloading {course.Name}...";
-        //        LoadingOverlay.IsVisible = true;
-        //        DownloadSpinner.IsRunning = true;
-
-        //        try
-        //        {
-        //            await DownloadCourseDataAsync(course);
-        //            await LoadSavedCoursesFromDbAsync(); // Refresh the saved list UI
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
-        //            return;
-        //        }
-        //        finally
-        //        {
-        //            LoadingOverlay.IsVisible = false;
-        //            DownloadSpinner.IsRunning = false;
-        //            CourseSearchBar.Text = string.Empty;
-        //        }
-        //    }
-
-        //    // 2. Query available tees (works for both freshly downloaded and saved courses)
-        //    var availableTees = await dbService.GetAvailableTeesAsync(course.Name);
-        //    string selectedTeeColor = null;
-
-        //    if (availableTees != null && availableTees.Count > 0)
-        //    {
-        //        selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
-
-        //        if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
-        //        {
-        //            return;
-        //        }
-        //    }
-
-        //    // 3. Launch the course page once with the chosen configuration
-        //    await Navigation.PushAsync(new CoursePage(course.Name, selectedTeeColor));
-        //}
+        
 
         private async Task OpenCourseAsync(CourseSearchResult course)
         {
@@ -302,139 +251,7 @@ namespace AutoCaddie
                 await OpenCourseAsync(selectedCourse);
             }
         }
-        //private async void OnCourseCard_Tapped(object sender, EventArgs e)
-        //{
-        //    // Cast the sender to a View and grab the data it is bound to
-        //    if (sender is View view && view.BindingContext is CourseSearchResult selectedCourse)
-        //    {
-        //        ResultsList.SelectedItem = null;
-
-        //        var dbService = new AutoCaddie.Services.DatabaseService();
-        //        var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
-
-        //        // 1. CACHE CHECK: If holes exist locally, skip API download and launch!
-        //        if (existingHoles != null && existingHoles.Count > 0)
-        //        {
-        //            var availableTees = await dbService.GetAvailableTeesAsync(selectedCourse.Name);
-        //            string selectedTeeColor = null;
-
-
-        //            // ONLY pop up the selection if the course actually has tee colors mapped
-        //            if (availableTees != null && availableTees.Count > 0)
-        //            {
-        //                selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
-
-        //                // If the user taps Cancel, abort the launch
-        //                if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
-        //                {
-        //                    return;
-        //                }
-        //            }
-
-        //            // Launch the course and pass the color to the constructor!
-        //            await Navigation.PushAsync(new CoursePage(selectedCourse.Name, selectedTeeColor));
-        //            return;
-        //        }
-
-        //        // 2. Otherwise download course data from API
-        //        LoadingText.Text = $"Downloading {selectedCourse.Name}...";
-        //        LoadingOverlay.IsVisible = true;
-        //        DownloadSpinner.IsRunning = true;
-
-        //        try
-        //        {
-        //            await DownloadCourseDataAsync(selectedCourse);
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please check your connection and try again.", "OK");
-        //        }
-        //        finally
-        //        {
-        //            LoadingOverlay.IsVisible = false;
-        //            DownloadSpinner.IsRunning = false;
-        //            CourseSearchBar.Text = string.Empty;
-        //        }
-        //    }
-        //}
-        // Fires when selecting a course from SEARCH RESULTS
-        //private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
-        //{
-        //    if (e.CurrentSelection.FirstOrDefault() is CourseSearchResult selectedCourse)
-        //    {
-        //        ResultsList.SelectedItem = null;
-
-        //        var dbService = new AutoCaddie.Services.DatabaseService();
-        //        var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
-
-        //        1.CACHE CHECK: If holes exist locally, skip API download entirely!
-        //        if (existingHoles != null && existingHoles.Count > 0)
-        //        {
-        //            await Navigation.PushAsync(new CoursePage(selectedCourse.Name));
-        //            return;
-        //        }
-
-        //        2.Otherwise download course data from API
-        //         CourseSearchBar.Text = $"Downloading {selectedCourse.Name}...";
-        //        await DisplayAlert($"Course Data", "Downloading {selectedCourse.Name}...", "OK");
-        //        await DownloadCourseDataAsync(selectedCourse);
-        //        CourseSearchBar.Text = string.Empty;
-        //    }
-        //}
-        //private async void OnCourseSelected(object sender, SelectionChangedEventArgs e)
-        //{
-        //    // Grab the course the user tapped
-        //    if (e.CurrentSelection.FirstOrDefault() is CourseSearchResult selectedCourse)
-        //    {
-        //        // 1. Instantly clear the selection highlight
-        //        ResultsList.SelectedItem = null;
-
-        //        // 2. Show the loading overlay
-        //        LoadingText.Text = $"Downloading {selectedCourse.Name}...";
-        //        LoadingOverlay.IsVisible = true;
-        //        DownloadSpinner.IsRunning = true;
-
-        //        try
-        //        {
-        //            var dbService = new AutoCaddie.Services.DatabaseService();
-        //            var existingHoles = await dbService.GetHolesForCourseAsync(selectedCourse.Name);
-
-        //            // CACHE CHECK: If holes exist locally, skip API download!
-        //            if (existingHoles == null || existingHoles.Count == 0)
-        //            {
-        //                // Execute the download only once if not already cached
-        //                await DownloadCourseDataAsync(selectedCourse);
-        //            }
-
-        //            // Check for available tees after download/cache confirmation
-        //            var availableTees = await dbService.GetAvailableTeesAsync(selectedCourse.Name);
-        //            string selectedTeeColor = null;
-
-        //            if (availableTees != null && availableTees.Count > 0)
-        //            {
-        //                selectedTeeColor = await DisplayActionSheet("Select Tee Box", "Cancel", null, availableTees.ToArray());
-        //                if (string.IsNullOrEmpty(selectedTeeColor) || selectedTeeColor == "Cancel")
-        //                {
-        //                    return;
-        //                }
-        //            }
-
-        //            // Launch the course page once
-        //            await Navigation.PushAsync(new CoursePage(selectedCourse.Name, selectedTeeColor));
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            await DisplayAlert("Download Failed", "There was an issue downloading the course map. Please try again.", "OK");
-        //        }
-        //        finally
-        //        {
-        //            LoadingOverlay.IsVisible = false;
-        //            DownloadSpinner.IsRunning = false;
-        //            CourseSearchBar.Text = string.Empty;
-        //        }
-        //    }
-        //}
-
+       
         // Fires when selecting a course from MY COURSES(Local Database)
         private async void OnSavedCourseSelected(object sender, SelectionChangedEventArgs e)
         {
@@ -526,34 +343,7 @@ namespace AutoCaddie
                 await DisplayAlert("API Error", $"Could not process data: {ex.Message}", "OK");
             }
         }
-
-        //private async Task SaveDownloadedDataToDb(string courseName, OverpassResponse overpassData)
-        //{
-        //    var dbService = new AutoCaddie.Services.DatabaseService();
-
-        //    foreach (var element in overpassData.elements)
-        //    {
-        //        if (element.tags != null && element.tags.ContainsKey("golf") && element.tags["golf"] == "hole" && element.geometry != null && element.geometry.Count >= 2)
-        //        {
-        //            var tee = element.geometry.First();
-        //            var green = element.geometry.Last();
-
-        //            var hole = new AutoCaddie.Models.GolfHole
-        //            {
-        //                CourseName = courseName,
-        //                HoleNumber = int.TryParse(element.tags.GetValueOrDefault("ref"), out int refNum) ? refNum : 0,
-        //                Par = int.TryParse(element.tags.GetValueOrDefault("par"), out int parNum) ? parNum : 4,
-        //                TeeLatitude = tee.lat,
-        //                TeeLongitude = tee.lon,
-        //                GreenLatitude = green.lat,
-        //                GreenLongitude = green.lon,
-        //                IsFavorite = false
-        //            };
-
-        //            await dbService.SaveHoleAsync(hole);
-        //        }
-        //    }
-        //}
+        
 
         private async Task SaveDownloadedDataToDb(string courseName, OverpassResponse overpassData)
         {
@@ -643,123 +433,13 @@ namespace AutoCaddie
                         continue;
                     }
 
-                    // Save the newly categorized feature to the database
-                    // (You will need to add SaveMapFeatureAsync to your DatabaseService)
+                    
                     await dbService.SaveMapFeatureAsync(feature);
                 }
             }
         }
 
-        //private async Task SaveDownloadedDataToDb(string courseName, OverpassResponse overpassData)
-        //{
-        //    if (overpassData?.elements == null) return;
-
-        //    var dbService = new AutoCaddie.Services.DatabaseService();
-
-        //    foreach (var element in overpassData.elements)
-        //    {
-        //        if (element.tags == null)
-        //            continue;
-
-        //        // 1. EXTRACT AND CONVERT DIRECTLY TO MAUI LOCATIONS
-        //        var activeGeometry = new List<Microsoft.Maui.Devices.Sensors.Location>();
-
-        //        // Standard ways
-        //        if (element.geometry != null)
-        //        {
-        //            activeGeometry.AddRange(element.geometry.Select(g =>
-        //                new Microsoft.Maui.Devices.Sensors.Location(g.lat, g.lon)));
-        //        }
-
-        //        // Multipolygon relations (Madisonville Fairways)
-        //        if (element.type == "relation" && element.members != null)
-        //        {
-        //            foreach (var member in element.members.Where(m => m.role == "outer"))
-        //            {
-        //                if (member.geometry != null)
-        //                {
-        //                    activeGeometry.AddRange(member.geometry.Select(g =>
-        //                        new Microsoft.Maui.Devices.Sensors.Location(g.lat, g.lon)));
-        //                }
-        //            }
-        //        }
-
-        //        // If it's still empty, skip it
-        //        if (activeGeometry.Count == 0)
-        //            continue;
-
-        //        string golfTag = element.tags.GetValueOrDefault("golf", "").ToLower();
-        //        string naturalTag = element.tags.GetValueOrDefault("natural", "").ToLower();
-        //        string refTag = element.tags.GetValueOrDefault("ref", "0");
-
-        //        var associatedHoles = refTag.Split(';')
-        //                                    .Select(r => int.TryParse(r.Trim(), out int h) ? h : 0)
-        //                                    .ToList();
-
-        //        // Serialize the native MAUI Locations!
-        //        string jsonGeom = System.Text.Json.JsonSerializer.Serialize(activeGeometry);
-
-        //        foreach (int holeNum in associatedHoles)
-        //        {
-        //            var feature = new AutoCaddie.Models.CourseMapFeature
-        //            {
-        //                CourseName = courseName,
-        //                HoleNumber = holeNum,
-        //                SerializedCoordinates = jsonGeom
-        //            };
-
-        //            if (golfTag == "hole")
-        //            {
-        //                feature.FeatureType = "HoleLine";
-
-        //                var tee = activeGeometry.First();
-        //                var green = activeGeometry.Last();
-        //                int par = int.TryParse(element.tags.GetValueOrDefault("par"), out int p) ? p : 4;
-
-        //                var oldHoleModel = new AutoCaddie.Models.GolfHole
-        //                {
-        //                    CourseName = courseName,
-        //                    HoleNumber = holeNum,
-        //                    Par = par,
-        //                    // USE .Latitude and .Longitude now!
-        //                    TeeLatitude = tee.Latitude,
-        //                    TeeLongitude = tee.Longitude,
-        //                    GreenLatitude = green.Latitude,
-        //                    GreenLongitude = green.Longitude
-        //                };
-        //                await dbService.SaveHoleAsync(oldHoleModel);
-        //            }
-        //            else if (golfTag == "green")
-        //            {
-        //                feature.FeatureType = "Green";
-        //            }
-        //            else if (golfTag == "tee")
-        //            {
-        //                feature.FeatureType = "Tee";
-        //                feature.TeeColor = element.tags.GetValueOrDefault("colour", "white");
-        //            }
-        //            else if (golfTag == "fairway")
-        //            {
-        //                feature.FeatureType = "Fairway";
-        //            }
-        //            else if (golfTag == "bunker")
-        //            {
-        //                feature.FeatureType = "Bunker";
-        //            }
-        //            else if (golfTag == "water_hazard" || naturalTag == "water")
-        //            {
-        //                feature.FeatureType = "Water";
-        //            }
-        //            else
-        //            {
-        //                continue;
-        //            }
-
-        //            await dbService.SaveMapFeatureAsync(feature);
-        //        }
-        //    }
-        //}
-
+       
         // Toggles a course as a Favorite / Home course
         private async void OnFavoriteToggle_Clicked(object sender, EventArgs e)
         {
@@ -797,7 +477,7 @@ namespace AutoCaddie
 
             public Color StarFill => IsFavorite ? Color.FromArgb("#FFC107") : Colors.Transparent; // Gold when active, clear when empty
             public Color StarStroke => IsFavorite ? Color.FromArgb("#FFA000") : Color.FromArgb("#7C4DFF"); // Deep gold or purple outline
-           // public string FavoriteIcon { get; set; } = "star_outline.png";
+          
         }
 
         public class OverpassResponse
