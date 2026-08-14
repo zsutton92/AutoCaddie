@@ -31,6 +31,8 @@ public partial class CoursePage : ContentPage
     private bool _isMuted = false;
     private bool _showLayupArcs = true;
 
+    private bool _hasReachedGreen = false;
+
     private int _currentIndex = 0;
 
     private double _lastShotDistance = 0;
@@ -169,7 +171,25 @@ public partial class CoursePage : ContentPage
             return;
         }
 
-        if (targetYards <= 30)
+        if (_lastKnownLocation != null && _currentGreenPolygon != null && _currentGreenPolygon.Count > 0)
+        {
+            if (IsPointInPolygon(_lastKnownLocation, _currentGreenPolygon))
+            {
+                SuggestionLabel.Text = "Caddie: Putter";
+                return;
+            }
+        }
+
+        // --- NEW: Raw Yardage for Short Game (Ignore Wind) ---
+        // We use _currentCenterYards here because a 15-yard putt shouldn't 
+        // switch to a chip just because there is a 10mph headwind!
+        if (_currentCenterYards <= 20)
+        {
+            SuggestionLabel.Text = "Caddie: Putter";
+            return;
+        }
+
+        if (_currentCenterYards <= 40)
         {
             SuggestionLabel.Text = "Caddie: Pitch / Chip";
             return;
@@ -213,7 +233,14 @@ public partial class CoursePage : ContentPage
 
             var currentHole = _holes[_currentIndex];
 
-            if (shotDistanceToLog >= 10 && _currentCenterYards > 20)
+            double distToCenterFromLastShot = _lastAnnouncedLocation != null ?
+                Location.CalculateDistance(_lastAnnouncedLocation.Latitude, _lastAnnouncedLocation.Longitude, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1093.61 : 999;
+
+            // --- NEW: Approach Shot Logic ---
+            // A shot counts if it's > 15 yards AND (it started > 30 yards from the pin OR ended > 30 yards from the pin)
+            // This prevents 15-yard walks back-and-forth across the green from adding ghost strokes
+           
+            if (shotDistanceToLog >= 15 && (distToCenterFromLastShot > 30 || _currentCenterYards > 30))
             {
                 if (_roundScores.ContainsKey(currentHole.HoleNumber) && _roundScores[currentHole.HoleNumber] < 15)
                 {
@@ -225,6 +252,8 @@ public partial class CoursePage : ContentPage
                     {
                         ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
                     });
+
+                    UpdateRoundScoreToPar();
                 }
             }
 
@@ -358,7 +387,7 @@ public partial class CoursePage : ContentPage
 
         if (!_roundScores.ContainsKey(currentHole.HoleNumber))
         {
-            _roundScores[currentHole.HoleNumber] = currentHole.Par;
+            _roundScores[currentHole.HoleNumber] = 1;
         }
 
         if (!_roundPutts.ContainsKey(currentHole.HoleNumber))
@@ -761,6 +790,41 @@ public partial class CoursePage : ContentPage
         _lastKnownLocation = myLocation;
         UpdateYardages(_lastKnownLocation);
 
+        var currentHole = _holes[_currentIndex];
+
+        // 1. Check if they have reached the current green (within 30 yards of the pin)
+        if (!_hasReachedGreen && _currentCenterYards <= 30)
+        {
+            _hasReachedGreen = true;
+        }
+
+        // 2. If they've visited the green, start looking for the next tee box
+        if (_hasReachedGreen && _currentIndex < _holes.Count - 1)
+        {
+            var nextHole = _holes[_currentIndex + 1];
+
+            double distToNextTeeMeters = Location.CalculateDistance(
+                myLocation.Latitude, myLocation.Longitude,
+                nextHole.TeeLatitude, nextHole.TeeLongitude,
+                DistanceUnits.Kilometers) * 1000.0;
+
+            double distToNextTeeYards = distToNextTeeMeters * 1.09361;
+
+            // NEW: To transition, they must walk OFF the green (> 30 yards away) 
+            // AND be within a massive 120-yard net of the next tee's center coordinates.
+            if (distToNextTeeYards <= 120 && _currentCenterYards > 30)
+            {
+                // IMMEDIATELY disable the handshake so the GPS doesn't spam this
+                _hasReachedGreen = false;
+
+                // Force the UI update to run on the main thread
+                Dispatcher.Dispatch(() =>
+                {
+                    OnNextHole_Clicked(this, EventArgs.Empty);
+                });
+            }
+        }
+
         double distFromLastElevation = _lastElevationLocation != null ?
             Location.CalculateDistance(_lastElevationLocation, myLocation, DistanceUnits.Kilometers) * 1093.61 : 999;
 
@@ -800,48 +864,58 @@ public partial class CoursePage : ContentPage
     {
         if (_holes.Count == 0) return;
 
-        int totalStrokes = 0;
-        int totalPar = 0;
+        var currentHole = _holes[_currentIndex];
+
+        int displayStrokes = 0;
+        int scoreDifference = 0;
 
         foreach (var kvp in _roundScores)
         {
             int holeNum = kvp.Key;
             int strokes = kvp.Value;
+            int putts = _roundPutts.ContainsKey(holeNum) ? _roundPutts[holeNum] : 0;
 
-            // Find the par for this specific hole
             var hole = _holes.FirstOrDefault(h => h.HoleNumber == holeNum);
             if (hole != null)
             {
-                totalStrokes += strokes;
-                totalPar += hole.Par;
+                // If it's 1 stroke and 0 putts, you haven't actually hit a ball on this hole yet.
+                // We completely ignore it so it doesn't artificially inflate your tally.
+                if (strokes == 1 && putts == 0)
+                {
+                    continue;
+                }
+
+                // A hole is "Completed" if we've moved past it, or if we've started putting on it.
+                bool isCompleted = (holeNum < currentHole.HoleNumber) || putts > 0;
+
+                if (isCompleted)
+                {
+                    displayStrokes += strokes;
+                    scoreDifference += (strokes - hole.Par);
+                }
+                else
+                {
+                    // If you're currently playing the fairway, 'strokes' reflects the shot you are ABOUT to hit.
+                    // So the number of strokes you've actually taken so far is (strokes - 1).
+                    displayStrokes += (strokes - 1);
+                }
             }
         }
 
-        int scoreDifference = totalStrokes - totalPar;
-        string formattedScore;
-
-        if (scoreDifference == 0)
-        {
-            formattedScore = "E"; // Even par
-        }
-        else if (scoreDifference > 0)
-        {
-            formattedScore = $"+{scoreDifference}"; // Over par
-        }
-        else
-        {
-            formattedScore = $"{scoreDifference}"; // Under par (e.g., -1)
-        }
+        string formattedScore = scoreDifference == 0 ? "E" : (scoreDifference > 0 ? $"+{scoreDifference}" : $"{scoreDifference}");
 
         Dispatcher.Dispatch(() =>
         {
-            RoundToParLabel.Text = $"{totalStrokes} ({formattedScore})";
+            RoundToParLabel.Text = $"{displayStrokes} ({formattedScore})";
         });
     }
     private async void OnNextHole_Clicked(object sender, EventArgs e)
     {
         if (_holes.Count == 0) return;
         _currentIndex = (_currentIndex + 1) % _holes.Count;
+        _hasReachedGreen = false;
+
+        _lastShotDistance = 0;
 
         if (!_isPreviewMode)
         {
@@ -857,6 +931,8 @@ public partial class CoursePage : ContentPage
     {
         if (_holes.Count == 0) return;
         _currentIndex = (_currentIndex - 1 + _holes.Count) % _holes.Count;
+        _hasReachedGreen = false;
+        _lastShotDistance = 0;
 
         if (!_isPreviewMode)
         {
@@ -1170,7 +1246,7 @@ public partial class CoursePage : ContentPage
         if (_roundPutts[currentHole.HoleNumber] < 10)
         {
             _roundPutts[currentHole.HoleNumber]++;
-            UpdateRoundScoreToPar();
+           
             PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
 
             if (_roundScores[currentHole.HoleNumber] < 15)
@@ -1178,6 +1254,8 @@ public partial class CoursePage : ContentPage
                 _roundScores[currentHole.HoleNumber]++;
                 ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
             }
+
+            UpdateRoundScoreToPar();
         }
     }
 
@@ -1214,7 +1292,7 @@ public partial class CoursePage : ContentPage
         if (_roundPutts[currentHole.HoleNumber] > 0)
         {
             _roundPutts[currentHole.HoleNumber]--;
-            UpdateRoundScoreToPar();
+           
             PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
 
             if (_roundScores[currentHole.HoleNumber] > 1)
@@ -1222,6 +1300,7 @@ public partial class CoursePage : ContentPage
                 _roundScores[currentHole.HoleNumber]--;
                 ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
             }
+            UpdateRoundScoreToPar();
         }
     }
 
