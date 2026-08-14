@@ -28,17 +28,25 @@ namespace AutoCaddie
         }
         private async Task RequestLocationPermissionOnStartup()
         {
+            // Ask for foreground first
             var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
-
             if (status != PermissionStatus.Granted)
             {
                 status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
             }
 
-            if (status != PermissionStatus.Granted)
+            // Then upgrade to background (Always)
+            if (status == PermissionStatus.Granted)
             {
-                // Optional: A friendly nudge if they deny it on startup
-                await DisplayAlert("GPS Required", "AutoCaddie needs location access to give you accurate yardages on the course.", "Got it");
+                var alwaysStatus = await Permissions.CheckStatusAsync<Permissions.LocationAlways>();
+                if (alwaysStatus != PermissionStatus.Granted)
+                {
+                    await Permissions.RequestAsync<Permissions.LocationAlways>();
+                }
+            }
+            else
+            {
+                await DisplayAlert("GPS Required", "AutoCaddie needs location access to track shots.", "Got it");
             }
         }
 

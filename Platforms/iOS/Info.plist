@@ -28,5 +28,15 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>AutoCaddie needs background location to automatically track your shots and score while your phone is in your pocket.</string>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>AutoCaddie needs your location to show yardages to the green.</string>
+
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

@@ -110,7 +110,7 @@ public class DatabaseService
         return await _db.Table<AutoCaddie.Models.CourseMapFeature>()
                     .Where(f => f.CourseName == courseName &&
                           (f.HoleNumber == holeNumber ||
-                          (f.HoleNumber == 0 && f.FeatureType != "Tee" && f.FeatureType != "Green")))
+                          (f.HoleNumber == 0 && f.FeatureType != "Water")))
                     .ToListAsync();
     }
     public async Task<List<GolfHole>> GetHolesForCourseAsync(string courseName)
@@ -198,12 +198,7 @@ public class DatabaseService
         }
     }
 
-    // Fetches all completed rounds, sorted by newest first
-    //public async Task<List<GolfRound>> GetAllRoundsAsync()
-    //{
-    //    await Init();
-    //    return await _db.Table<GolfRound>().OrderByDescending(r => r.DatePlayed).ToListAsync();
-    //}
+  
 
     // Fetches the specific hole-by-hole scores for a single round
     public async Task<List<HoleScore>> GetScoresForRoundAsync(int roundId)

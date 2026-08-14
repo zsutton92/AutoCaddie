@@ -8,6 +8,7 @@ public partial class CourseDetailsPage : ContentPage
 {
     private string _courseName;
     private DatabaseService _dbService = new();
+    private CourseWeather _currentWeather = new CourseWeather();
 
     public CourseDetailsPage(string courseName)
     {
@@ -37,22 +38,29 @@ public partial class CourseDetailsPage : ContentPage
             var holes = await _dbService.GetHolesForCourseAsync(_courseName);
             if (holes == null || holes.Count == 0) return;
 
-            // Use the 1st hole's tee box to ping the weather API
             double lat = holes.First().TeeLatitude;
             double lon = holes.First().TeeLongitude;
 
             using HttpClient client = new HttpClient();
-            string url = $"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph";
+            string url = $"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph";
 
             var response = await client.GetStringAsync(url);
             var weatherData = JsonSerializer.Deserialize<OpenMeteoResponse>(response, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (weatherData?.current != null)
             {
-                TempLabel.Text = $"{Math.Round(weatherData.current.temperature_2m)}°F";
-                WindLabel.Text = $"{Math.Round(weatherData.current.wind_speed_10m)} mph";
+                // Populate the object
+                _currentWeather.WindSpeedMph = weatherData.current.wind_speed_10m;
+                _currentWeather.WindDirectionDegrees = weatherData.current.wind_direction_10m;
+                _currentWeather.Temperature = weatherData.current.temperature_2m;
+                _currentWeather.Condition = GetConditionString(weatherData.current.weather_code);
+                _currentWeather.LastUpdated = DateTime.Now;
 
-                SetWeatherCondition(weatherData.current.weather_code);
+                TempLabel.Text = $"{Math.Round(_currentWeather.Temperature)}°F";
+                WindLabel.Text = $"{Math.Round(_currentWeather.WindSpeedMph)} mph";
+
+                // Update UI with the condition string
+                SetWeatherCondition(_currentWeather.Condition);
             }
         }
         catch (Exception ex)
@@ -61,26 +69,40 @@ public partial class CourseDetailsPage : ContentPage
         }
     }
 
-    private void SetWeatherCondition(int code)
+    private string GetConditionString(int code)
     {
-        // WMO Weather interpretation codes
-        if (code == 0) { ConditionLabel.Text = "Clear"; WeatherIconLabel.Text = "☀️"; }
-        else if (code <= 3) { ConditionLabel.Text = "Cloudy"; WeatherIconLabel.Text = "⛅"; }
-        else if (code == 45 || code == 48) { ConditionLabel.Text = "Fog"; WeatherIconLabel.Text = "🌫️"; }
-        else if (code >= 51 && code <= 67) { ConditionLabel.Text = "Rain"; WeatherIconLabel.Text = "🌧️"; }
-        else if (code >= 71 && code <= 77) { ConditionLabel.Text = "Snow"; WeatherIconLabel.Text = "❄️"; }
-        else if (code >= 95) { ConditionLabel.Text = "Storm"; WeatherIconLabel.Text = "⛈️"; }
+        // Retaining your specific names (Fog, Cloudy, etc.)
+        if (code == 0) return "Clear";
+        if (code <= 3) return "Cloudy";
+        if (code == 45 || code == 48) return "Fog";
+        if (code >= 51 && code <= 67) return "Rain";
+        if (code >= 71 && code <= 77) return "Snow";
+        if (code >= 95) return "Storm";
+        return "Clear";
+    }
+
+    private void SetWeatherCondition(string condition)
+    {
+        ConditionLabel.Text = condition;
+
+        // Emoji logic matched to the condition string
+        if (condition == "Clear") WeatherIconLabel.Text = "☀️";
+        else if (condition == "Cloudy") WeatherIconLabel.Text = "⛅";
+        else if (condition == "Fog") WeatherIconLabel.Text = "🌫️";
+        else if (condition == "Rain") WeatherIconLabel.Text = "🌧️";
+        else if (condition == "Snow") WeatherIconLabel.Text = "❄️";
+        else if (condition == "Storm") WeatherIconLabel.Text = "⛈️";
+        else WeatherIconLabel.Text = "☀️";
     }
 
     private async void OnPreview_Clicked(object sender, EventArgs e)
     {
-        // Launch in preview mode (no GPS, no tees)
-        await Navigation.PushAsync(new CoursePage(_courseName, null, true));
+        // ADDED: Passing _currentWeather to the CoursePage
+        await Navigation.PushAsync(new CoursePage(_courseName, null, true, _currentWeather));
     }
 
     private async void OnStartRound_Clicked(object sender, EventArgs e)
     {
-        // Prompt for tees 
         var availableTees = await _dbService.GetAvailableTeesAsync(_courseName);
         string selectedTeeColor = null;
 
@@ -93,11 +115,19 @@ public partial class CourseDetailsPage : ContentPage
             }
         }
 
-        // Launch an active tracking round
-        await Navigation.PushAsync(new CoursePage(_courseName, selectedTeeColor, false));
+        // ADDED: Passing _currentWeather to the CoursePage
+        await Navigation.PushAsync(new CoursePage(_courseName, selectedTeeColor, false, _currentWeather));
     }
 
     // JSON Classes for Open-Meteo
     public class OpenMeteoResponse { public CurrentWeather current { get; set; } }
-    public class CurrentWeather { public double temperature_2m { get; set; } public int weather_code { get; set; } public double wind_speed_10m { get; set; } }
+
+    // ADDED: wind_direction_10m property so the parser doesn't crash
+    public class CurrentWeather
+    {
+        public double temperature_2m { get; set; }
+        public int weather_code { get; set; }
+        public double wind_speed_10m { get; set; }
+        public double wind_direction_10m { get; set; }
+    }
 }
