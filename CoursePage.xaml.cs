@@ -29,6 +29,7 @@ public partial class CoursePage : ContentPage
     private bool _isPreviewMode;
     private bool _isTracking = false;
     private bool _isMuted = false;
+    private bool _showLayupArcs = true;
 
     private int _currentIndex = 0;
 
@@ -357,7 +358,7 @@ public partial class CoursePage : ContentPage
 
         if (!_roundScores.ContainsKey(currentHole.HoleNumber))
         {
-            _roundScores[currentHole.HoleNumber] = 1;
+            _roundScores[currentHole.HoleNumber] = currentHole.Par;
         }
 
         if (!_roundPutts.ContainsKey(currentHole.HoleNumber))
@@ -434,6 +435,45 @@ public partial class CoursePage : ContentPage
                 googleMapForClearing.Clear();
             }
 #endif
+
+            // --- NEW: DRAW DYNAMIC LAYUP ARCS & AXIS ---
+            if (_showLayupArcs)
+            {
+                var greenCenter = new Location(currentHole.GreenLatitude, currentHole.GreenLongitude);
+                var activeTee = new Location(activeTeeLat, activeTeeLon);
+
+                // 1. Draw the Center Axis Line (from the Green out to 220 yards)
+                double axisBearing = CalculateBearing(greenCenter.Latitude, greenCenter.Longitude, activeTee.Latitude, activeTee.Longitude);
+                double axisDistMeters = 220 * 0.9144;
+                double earthRad = 6378137.0;
+                double angDist = axisDistMeters / earthRad;
+
+                double cLatRad = greenCenter.Latitude * (Math.PI / 180.0);
+                double cLonRad = greenCenter.Longitude * (Math.PI / 180.0);
+                double bRad = axisBearing * (Math.PI / 180.0);
+
+                double endLatRad = Math.Asin(Math.Sin(cLatRad) * Math.Cos(angDist) + Math.Cos(cLatRad) * Math.Sin(angDist) * Math.Cos(bRad));
+                double endLonRad = cLonRad + Math.Atan2(Math.Sin(bRad) * Math.Sin(angDist) * Math.Cos(cLatRad), Math.Cos(angDist) - Math.Sin(cLatRad) * Math.Sin(endLatRad));
+
+                var axisLine = new Microsoft.Maui.Controls.Maps.Polyline
+                {
+                    StrokeColor = Color.FromRgba(200, 200, 200, 150), // Subtle Gray
+                    StrokeWidth = 2
+                };
+                axisLine.Geopath.Add(greenCenter);
+                axisLine.Geopath.Add(new Location(endLatRad * (180.0 / Math.PI), endLonRad * (180.0 / Math.PI)));
+
+                CourseMap.MapElements.Add(axisLine);
+
+                // 2. Draw the 200-Yard Arc (Blue)
+                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 200, Color.FromRgba(65, 105, 225, 200)));
+
+                // 3. Draw the 150-Yard Arc (White)
+                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 150, Color.FromRgba(255, 255, 255, 200)));
+
+                // 4. Draw the 100-Yard Arc (Red)
+                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 100, Color.FromRgba(220, 20, 60, 200)));
+            }
 
             foreach (var feature in holeFeatures)
             {
@@ -524,6 +564,44 @@ public partial class CoursePage : ContentPage
         });
 
         UpdateRoundScoreToPar();
+    }
+
+    // Calculates points along a curve to create a perfect layup arc
+    private Microsoft.Maui.Controls.Maps.Polyline CreateLayupArc(Location greenCenter, Location teeBox, double distanceYards, Color arcColor)
+    {
+        var polyline = new Microsoft.Maui.Controls.Maps.Polyline
+        {
+            StrokeColor = arcColor,
+            StrokeWidth = 3
+        };
+
+        // 1. Get the direction from the Green pointing BACK towards the Tee
+        double baseBearing = CalculateBearing(greenCenter.Latitude, greenCenter.Longitude, teeBox.Latitude, teeBox.Longitude);
+
+        double distanceMeters = distanceYards * 0.9144;
+        double earthRadius = 6378137.0; // Earth's radius in meters
+        double angularDistance = distanceMeters / earthRadius;
+
+        double centerLatRad = greenCenter.Latitude * (Math.PI / 180.0);
+        double centerLonRad = greenCenter.Longitude * (Math.PI / 180.0);
+
+        // 2. Sweep a curve from -45 degrees to +45 degrees across the fairway
+        for (int i = -45; i <= 45; i += 5)
+        {
+            double currentBearing = (baseBearing + i + 360) % 360;
+            double bearingRad = currentBearing * (Math.PI / 180.0);
+
+            // Spherical trigonometry to find the exact Lat/Lon of each point on the curve
+            double pointLatRad = Math.Asin(Math.Sin(centerLatRad) * Math.Cos(angularDistance) +
+                                           Math.Cos(centerLatRad) * Math.Sin(angularDistance) * Math.Cos(bearingRad));
+
+            double pointLonRad = centerLonRad + Math.Atan2(Math.Sin(bearingRad) * Math.Sin(angularDistance) * Math.Cos(centerLatRad),
+                                                           Math.Cos(angularDistance) - Math.Sin(centerLatRad) * Math.Sin(pointLatRad));
+
+            polyline.Geopath.Add(new Location(pointLatRad * (180.0 / Math.PI), pointLonRad * (180.0 / Math.PI)));
+        }
+
+        return polyline;
     }
 
     private async Task StartGpsTracking()
@@ -1145,6 +1223,17 @@ public partial class CoursePage : ContentPage
                 ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
             }
         }
+    }
+
+    private async void OnToggleArcs_Clicked(object sender, EventArgs e)
+    {
+        _showLayupArcs = !_showLayupArcs;
+
+        // Dim the icon to 40% opacity when turned off
+        ArcsIconPath.Opacity = _showLayupArcs ? 1.0 : 0.4;
+
+        // Redraw the map to either inject or remove the circles
+        await DisplayCurrentHoleAsync();
     }
 
     public bool IsPointInPolygon(Microsoft.Maui.Devices.Sensors.Location point, List<Microsoft.Maui.Devices.Sensors.Location> polygon)
