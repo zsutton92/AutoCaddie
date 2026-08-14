@@ -244,11 +244,18 @@ public partial class CoursePage : ContentPage
             //string yardageSpeech = YardageLabel.Text.Replace("YDS", "yards to the center. ");
             string yardageSpeech = $"{_currentCenterYards} yards to the center. Playing like { PlaysLikeLabel.Text.Replace("Plays ", "").Replace("YDS","yards")}. ";
 
+            // --- CHECK FOR HAZARDS NEARBY ---
+            string hazardSpeech = "";
+            if (_lastKnownLocation != null)
+            {
+                hazardSpeech = await CheckNearestHazardsAsync(_lastKnownLocation) ?? "";
+            }
+
             string caddieSpeech = GetSpokenCaddieSuggestion();
 
             // string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
             // Example: "Great shot! Stroke 2. 145 yards. Playing like 152.  I suggest 8 iron."
-            string finalSpeech = $"{strokeSpeech}{caddieCompliment}{yardageSpeech}{caddieSpeech}";
+            string finalSpeech = $"{strokeSpeech}{caddieCompliment}{hazardSpeech}{yardageSpeech}{caddieSpeech}";
 
             if (_caddieVoice != null)
             {
@@ -866,6 +873,180 @@ public partial class CoursePage : ContentPage
         }
     }
 
+
+    //private async Task<(string hazardType, string side, double distanceYards, double carryYards)> CheckNearestHazardsAsync(Location myLocation)
+    //{
+    //    if (_holes.Count == 0 || myLocation == null) return (null, null, 0, 0);
+
+    //    var currentHole = _holes[_currentIndex];
+    //    var holeFeatures = await _dbService.GetMapFeaturesForHoleAsync(_courseName, currentHole.HoleNumber);
+
+    //    // Filter for hazards only
+    //    var hazardFeatures = holeFeatures.Where(f => f.FeatureType == "Bunker" || f.FeatureType == "Water").ToList();
+    //    if (hazardFeatures.Count == 0) return (null, null, 0, 0);
+
+    //    double closestDistance = double.MaxValue;
+    //    string closestType = null;
+    //    string side = "ahead";
+    //    double carryYards = 0;
+
+    //    foreach (var feature in hazardFeatures)
+    //    {
+    //        var rawNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(feature.SerializedCoordinates);
+    //        if (rawNodes == null || rawNodes.Count == 0) continue;
+
+    //        // Find the closest node of this hazard to the user
+    //        foreach (var node in rawNodes)
+    //        {
+    //            double distMeters = Location.CalculateDistance(
+    //                myLocation.Latitude, myLocation.Longitude,
+    //                node.lat, node.lon,
+    //                DistanceUnits.Kilometers) * 1000.0;
+
+    //            double distYards = distMeters * 1.09361;
+
+    //            if (distYards > 40 && distYards < 230 && distYards < closestDistance)
+    //            {
+    //                // Verify the hazard is roughly in the direction of the green (within a 75-degree cone)
+    //                double hazardBearing = CalculateBearing(myLocation.Latitude, myLocation.Longitude, node.lat, node.lon);
+    //                double greenBearing = CalculateBearing(myLocation.Latitude, myLocation.Longitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+    //                double angleDiff = Math.Abs(hazardBearing - greenBearing);
+    //                if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+    //                // If it's within 75 degrees of your target line, it's a real threat
+    //                if (angleDiff < 75)
+    //                {
+    //                    closestDistance = distYards;
+    //                    closestType = feature.FeatureType;
+
+    //                    double maxHazardDist = rawNodes.Max(n => Location.CalculateDistance(myLocation.Latitude, myLocation.Longitude, n.lat, n.lon, DistanceUnits.Kilometers) * 1093.61);
+    //                    carryYards = Math.Round(maxHazardDist);
+
+    //                    double relativeSideDiff = (hazardBearing - greenBearing + 360) % 360;
+    //                    side = (relativeSideDiff > 180) ? "left" : "right";
+    //                }
+    //            }
+    //        }
+    //    }
+
+    //    if (closestDistance < 230)
+    //    {
+    //        return (closestType, side, Math.Round(closestDistance), carryYards);
+    //    }
+
+    //    return (null, null, 0, 0);
+    //}
+
+    private async Task<string> CheckNearestHazardsAsync(Location myLocation)
+    {
+        if (_holes.Count == 0 || myLocation == null) return null;
+
+        var currentHole = _holes[_currentIndex];
+        var holeFeatures = await _dbService.GetMapFeaturesForHoleAsync(_courseName, currentHole.HoleNumber);
+
+        var hazardFeatures = holeFeatures.Where(f => f.FeatureType == "Bunker" || f.FeatureType == "Water").ToList();
+        if (hazardFeatures.Count == 0) return null;
+
+        // NEW: Calculate how far away the center of the green is
+        double greenDistMeters = Location.CalculateDistance(
+            myLocation.Latitude, myLocation.Longitude,
+            currentHole.GreenLatitude, currentHole.GreenLongitude,
+            DistanceUnits.Kilometers) * 1000.0;
+        double greenDistYards = greenDistMeters * 1.09361;
+
+        // Update the tuple to track if the hazard is past the green
+        List<(string Type, string SideText, double Distance, double Carry, bool IsPastGreen)> activeHazards = new();
+
+        foreach (var feature in hazardFeatures)
+        {
+            var rawNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(feature.SerializedCoordinates);
+            if (rawNodes == null || rawNodes.Count == 0) continue;
+
+            double featureClosestDist = double.MaxValue;
+            double featureFarthestDist = double.MinValue;
+            double closestNodeBearing = 0;
+
+            foreach (var node in rawNodes)
+            {
+                double distMeters = Location.CalculateDistance(
+                    myLocation.Latitude, myLocation.Longitude,
+                    node.lat, node.lon,
+                    DistanceUnits.Kilometers) * 1000.0;
+
+                double distYards = distMeters * 1.09361;
+
+                if (distYards < featureClosestDist)
+                {
+                    featureClosestDist = distYards;
+                    closestNodeBearing = CalculateBearing(myLocation.Latitude, myLocation.Longitude, node.lat, node.lon);
+                }
+                if (distYards > featureFarthestDist)
+                {
+                    featureFarthestDist = distYards;
+                }
+            }
+
+            if (featureClosestDist > 40 && featureClosestDist < 230)
+            {
+                double greenBearing = CalculateBearing(myLocation.Latitude, myLocation.Longitude, currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+                double angleDiff = Math.Abs(closestNodeBearing - greenBearing);
+                if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+                if (angleDiff < 75)
+                {
+                    // NEW: Determine if this hazard is pin-high or past the green (giving a 15-yard buffer for the front edge)
+                    bool isPastGreen = featureClosestDist > (greenDistYards - 15);
+
+                    double relativeSideDiff = (closestNodeBearing - greenBearing + 360) % 360;
+                    string side = (relativeSideDiff > 180) ? "left" : "right";
+                    string sideText;
+
+                    // NEW: Change the vocabulary based on if it's past the green
+                    if (isPastGreen)
+                    {
+                        if (angleDiff < 12) sideText = "long";
+                        else sideText = $"long and {side}";
+                    }
+                    else
+                    {
+                        if (angleDiff < 12) sideText = "straight ahead";
+                        else sideText = $"on the {side}";
+                    }
+
+                    activeHazards.Add((feature.FeatureType, sideText, Math.Round(featureClosestDist), Math.Round(featureFarthestDist), isPastGreen));
+                }
+            }
+        }
+
+        if (activeHazards.Count == 0) return null;
+
+        activeHazards = activeHazards.OrderBy(h => h.Distance).ToList();
+
+        List<string> warnings = new List<string>();
+        foreach (var hazard in activeHazards)
+        {
+            // NEW: If it's past the green, drop the carry yardage entirely!
+            if (hazard.IsPastGreen)
+            {
+                warnings.Add($"{hazard.Type} {hazard.SideText}, starting at {hazard.Distance} yards");
+            }
+            else
+            {
+                if (hazard.Type == "Water")
+                {
+                    warnings.Add($"Water {hazard.SideText}, starting {hazard.Distance} yards away ({hazard.Carry} yards to carry)");
+                }
+                else if (hazard.Type == "Bunker")
+                {
+                    warnings.Add($"Bunker {hazard.SideText} at {hazard.Distance} yards ({hazard.Carry} yards to carry)");
+                }
+            }
+        }
+
+        return string.Join(". Also, ", warnings) + ". ";
+    }
     private async void OnClubSelected_Clicked(object sender, EventArgs e)
     {
         if (sender is Button btn && btn.CommandParameter is GolfClub selectedClub)
@@ -922,6 +1103,31 @@ public partial class CoursePage : ContentPage
         }
     }
 
+    private async void OnUndoShot_Clicked(object sender, EventArgs e)
+    {
+        if (_holes.Count == 0) return;
+
+        var currentHole = _holes[_currentIndex];
+
+        // Ensure we don't drop below 1 stroke
+        if (_roundScores.ContainsKey(currentHole.HoleNumber) && _roundScores[currentHole.HoleNumber] > 1)
+        {
+            _roundScores[currentHole.HoleNumber]--;
+            ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
+
+            // Refresh the live leader board math
+            UpdateRoundScoreToPar();
+
+            // Tell the database service to remove the last recorded shot log for this round/club
+            await _dbService.UndoLastShotAsync();
+
+            await DisplayAlert("Shot Undone", "Last registered stroke has been removed.", "OK");
+        }
+        else
+        {
+            await DisplayAlert("Notice", "Cannot go below 1 stroke on a hole.", "OK");
+        }
+    }
     private void OnMinusPutt_Clicked(object sender, EventArgs e)
     {
         if (_holes.Count == 0) return;

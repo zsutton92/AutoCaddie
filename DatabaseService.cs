@@ -113,6 +113,20 @@ public class DatabaseService
                           (f.HoleNumber == 0 && f.FeatureType != "Water")))
                     .ToListAsync();
     }
+
+    public async Task UndoLastShotAsync()
+    {
+        await Init();
+
+        // Find the most recently added shot in the table
+        var lastShot = await _db.Table<TrackedShot>()
+                                      .OrderByDescending(s => s.Id)
+                                      .FirstOrDefaultAsync();
+        if (lastShot != null)
+        {
+            await _db.DeleteAsync(lastShot);
+        }
+    }
     public async Task<List<GolfHole>> GetHolesForCourseAsync(string courseName)
     {
         await Init();
