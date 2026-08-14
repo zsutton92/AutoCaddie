@@ -73,10 +73,15 @@
                         <RoundRectangle CornerRadius="15" />
                     </Border.StrokeShape>
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="-2">
-                        <Label x:Name="BackYardageLabel" Text="-- B" TextColor="#A0A0A0" FontSize="12" FontAttributes="Bold" HorizontalOptions="Center" />
-                        <Label x:Name="YardageLabel" Text="-- YDS" TextColor="White" FontSize="26" FontAttributes="Bold" HorizontalOptions="Center" />
-                        <Label x:Name="PlaysLikeLabel" Text="Plays --" TextColor="#FFD700" FontSize="15" FontAttributes="Bold" HorizontalOptions="Center" Margin="0,2,0,0"/>
+
+                        <!-- BIG PLAYS LIKE NUMBER -->
+                        <Label x:Name="PlaysLikeLabel" Text="-- YDS" TextColor="#FFD700" FontSize="30" FontAttributes="Bold" HorizontalOptions="Center" />
+
+                        <!-- SMALL B/C/F STACK -->
+                        <Label x:Name="BackYardageLabel" Text="-- B" TextColor="#A0A0A0" FontSize="12" FontAttributes="Bold" HorizontalOptions="Center" Margin="0,4,0,0"/>
+                        <Label x:Name="YardageLabel" Text="-- C" TextColor="#A0A0A0" FontSize="12" FontAttributes="Bold" HorizontalOptions="Center" />
                         <Label x:Name="FrontYardageLabel" Text="-- F" TextColor="#A0A0A0" FontSize="12" FontAttributes="Bold" HorizontalOptions="Center" />
+
                     </VerticalStackLayout>
                 </Border>
             </Grid>
@@ -114,6 +119,13 @@
                                Text="Par 4" 
                                FontSize="14" 
                                TextColor="#666666" 
+                               HorizontalTextAlignment="Center" 
+                               HorizontalOptions="Center" />
+                        <Label x:Name="RoundToParLabel" 
+                               Text="Total: E" 
+                               FontSize="12" 
+                               TextColor="#4A34D4" 
+                               FontAttributes="Bold" 
                                HorizontalTextAlignment="Center" 
                                HorizontalOptions="Center" />
                     </VerticalStackLayout>

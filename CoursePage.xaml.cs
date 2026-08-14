@@ -14,6 +14,7 @@ public partial class CoursePage : ContentPage
     private IDispatcherTimer _weatherRefreshTimer;
     private Location _lastKnownLocation;
     private Location _lastAnnouncedLocation;
+    private Location _lastElevationLocation = null;
     private List<GolfHole> _holes = new();
     private List<Location> _currentGreenPolygon = new();
     private List<GolfClub> _myBag = new();
@@ -34,7 +35,9 @@ public partial class CoursePage : ContentPage
     private double _lastShotDistance = 0;
     private double _pendingShotDistance = 0;
     private double _currentCenterYards = 0;
-
+    private double? _currentGreenElevationMeters = null;
+    private double? _currentUserElevationMeters = null;
+    
     private IDispatcherTimer _announceTimer;
     private SpeechOptions _caddieVoice;
 
@@ -239,12 +242,13 @@ public partial class CoursePage : ContentPage
             }
 
             //string yardageSpeech = YardageLabel.Text.Replace("YDS", "yards to the center. ");
-            string yardageSpeech = $"{_currentCenterYards} yards. Playing like {PlaysLikeLabel.Text.Replace("Plays ", "")}. ";
+            string yardageSpeech = $"{_currentCenterYards} yards to the center. Playing like { PlaysLikeLabel.Text.Replace("Plays ", "").Replace("YDS","yards")}. ";
+
             string caddieSpeech = GetSpokenCaddieSuggestion();
 
             // string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
-            // Example: "Great shot! 145 yards. Playing like 152. Stroke 2. I suggest 8 iron."
-            string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
+            // Example: "Great shot! Stroke 2. 145 yards. Playing like 152.  I suggest 8 iron."
+            string finalSpeech = $"{strokeSpeech}{caddieCompliment}{yardageSpeech}{caddieSpeech}";
 
             if (_caddieVoice != null)
             {
@@ -332,6 +336,15 @@ public partial class CoursePage : ContentPage
 
         var currentHole = _holes[_currentIndex];
 
+        _currentGreenElevationMeters = null;
+        _currentUserElevationMeters = null;
+        _lastElevationLocation = null;
+
+        Task.Run(async () =>
+        {
+            _currentGreenElevationMeters = await FetchElevationAsync(currentHole.GreenLatitude, currentHole.GreenLongitude);
+        });
+
         HoleTitleLabel.Text = $"Hole {currentHole.HoleNumber}";
         ParLabel.Text = $"Par {currentHole.Par}";
 
@@ -356,8 +369,9 @@ public partial class CoursePage : ContentPage
         {
             Dispatcher.Dispatch(() =>
             {
+                PlaysLikeLabel.Text = "-- YDS";
                 BackYardageLabel.Text = "-- B";
-                YardageLabel.Text = "-- YDS";
+                YardageLabel.Text = "-- C";
                 FrontYardageLabel.Text = "-- F";
             });
         }
@@ -501,6 +515,8 @@ public partial class CoursePage : ContentPage
         CourseMap.MoveToRegion(MapSpan.FromCenterAndRadius(centerPosition, Distance.FromMeters(250)));
 #endif
         });
+
+        UpdateRoundScoreToPar();
     }
 
     private async Task StartGpsTracking()
@@ -618,20 +634,32 @@ public partial class CoursePage : ContentPage
         // 3. Calculate the relative angle of the wind to your specific shot line
         double relativeWindAngle = (windBlowingTo - userToGreenBearing + 360) % 360;
 
-        // 4. Calculate effective wind using Trigonometry (Cos(angle) * speed).
+        // 4A. Calculate effective wind using Trigonometry (Cos(angle) * speed).
         // Tailwind (0 deg) = Cos(0) = 1. Headwind (180 deg) = Cos(180) = -1. Crosswind (90 deg) = Cos(90) = 0.
         double effectiveWindMph = Math.Cos(relativeWindAngle * (Math.PI / 180.0)) * _courseWeather.WindSpeedMph;
 
+        // 4B. SLOPE MATH
+        double slopeImpactYards = 0;
+        if (_currentGreenElevationMeters.HasValue && _currentUserElevationMeters.HasValue)
+        {
+            // 1 meter of elevation change = ~1.09 yards of distance change
+            // If the Green is higher (+), it adds yards. If lower (-), it subtracts.
+            slopeImpactYards = (_currentGreenElevationMeters.Value - _currentUserElevationMeters.Value) * 1.09361;
+        }
+
         // 5. Golf Rule of Thumb: 1 mph of direct wind = ~1 yard of impact.
         // Since effectiveWindMph is positive for a tailwind, we SUBTRACT it to get the playing distance.
-        double playsLikeYards = Math.Round(centerYards - effectiveWindMph);
+        double playsLikeYards = Math.Round(centerYards - effectiveWindMph + slopeImpactYards);
 
         Dispatcher.Dispatch(() =>
         {
+            // Update the huge Plays Like label
+            PlaysLikeLabel.Text = $"{playsLikeYards} YDS";
+
+            // Update the small labels B, C, F
             BackYardageLabel.Text = $"{backYards} B";
-            YardageLabel.Text = $"{centerYards} YDS";
+            YardageLabel.Text = $"{centerYards} C";
             FrontYardageLabel.Text = $"{frontYards} F";
-            PlaysLikeLabel.Text = $"Plays {playsLikeYards}";
 
             //UpdateClubSuggestion(centerYards);
             UpdateClubSuggestion(playsLikeYards);
@@ -647,6 +675,22 @@ public partial class CoursePage : ContentPage
 
         _lastKnownLocation = myLocation;
         UpdateYardages(_lastKnownLocation);
+
+        double distFromLastElevation = _lastElevationLocation != null ?
+            Location.CalculateDistance(_lastElevationLocation, myLocation, DistanceUnits.Kilometers) * 1093.61 : 999;
+
+        // Only ping the network if they moved 15+ yards to save battery
+        if (distFromLastElevation > 15)
+        {
+            _lastElevationLocation = myLocation;
+            Task.Run(async () =>
+            {
+                _currentUserElevationMeters = await FetchElevationAsync(myLocation.Latitude, myLocation.Longitude);
+
+                // Force a quick yardage refresh to apply the new slope math!
+                UpdateYardages(myLocation);
+            });
+        }
 
         bool isNewHole = _lastAnnouncedLocation == null;
 
@@ -667,7 +711,48 @@ public partial class CoursePage : ContentPage
             }
         }
     }
+    private void UpdateRoundScoreToPar()
+    {
+        if (_holes.Count == 0) return;
 
+        int totalStrokes = 0;
+        int totalPar = 0;
+
+        foreach (var kvp in _roundScores)
+        {
+            int holeNum = kvp.Key;
+            int strokes = kvp.Value;
+
+            // Find the par for this specific hole
+            var hole = _holes.FirstOrDefault(h => h.HoleNumber == holeNum);
+            if (hole != null)
+            {
+                totalStrokes += strokes;
+                totalPar += hole.Par;
+            }
+        }
+
+        int scoreDifference = totalStrokes - totalPar;
+        string formattedScore;
+
+        if (scoreDifference == 0)
+        {
+            formattedScore = "E"; // Even par
+        }
+        else if (scoreDifference > 0)
+        {
+            formattedScore = $"+{scoreDifference}"; // Over par
+        }
+        else
+        {
+            formattedScore = $"{scoreDifference}"; // Under par (e.g., -1)
+        }
+
+        Dispatcher.Dispatch(() =>
+        {
+            RoundToParLabel.Text = $"{totalStrokes} ({formattedScore})";
+        });
+    }
     private async void OnNextHole_Clicked(object sender, EventArgs e)
     {
         if (_holes.Count == 0) return;
@@ -719,6 +804,7 @@ public partial class CoursePage : ContentPage
         {
             _roundScores[currentHole.HoleNumber]++;
             ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
+            UpdateRoundScoreToPar();
             await EvaluateFIRAsync(currentHole);
         }
     }
@@ -732,6 +818,7 @@ public partial class CoursePage : ContentPage
         if (_roundScores[currentHole.HoleNumber] > 1)
         {
             _roundScores[currentHole.HoleNumber]--;
+            UpdateRoundScoreToPar();
             ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
         }
     }
@@ -824,6 +911,7 @@ public partial class CoursePage : ContentPage
         if (_roundPutts[currentHole.HoleNumber] < 10)
         {
             _roundPutts[currentHole.HoleNumber]++;
+            UpdateRoundScoreToPar();
             PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
 
             if (_roundScores[currentHole.HoleNumber] < 15)
@@ -842,6 +930,7 @@ public partial class CoursePage : ContentPage
         if (_roundPutts[currentHole.HoleNumber] > 0)
         {
             _roundPutts[currentHole.HoleNumber]--;
+            UpdateRoundScoreToPar();
             PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
 
             if (_roundScores[currentHole.HoleNumber] > 1)
@@ -889,6 +978,27 @@ public partial class CoursePage : ContentPage
         }
     }
 
+    private async Task<double?> FetchElevationAsync(double lat, double lon)
+    {
+        try
+        {
+            using HttpClient client = new HttpClient();
+            string url = $"https://api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}";
+            var response = await client.GetStringAsync(url);
+            var data = System.Text.Json.JsonSerializer.Deserialize<OpenMeteoElevationResponse>(response, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (data?.elevation != null && data.elevation.Length > 0)
+            {
+                return data.elevation[0];
+            }
+        }
+        catch
+        {
+            // Fails silently if no cell service
+        }
+        return null;
+    }
+
     private async void InjectFakeTestData()
     {
         var bag = await _dbService.GetMyBagAsync();
@@ -919,5 +1029,10 @@ public partial class CoursePage : ContentPage
         public int weather_code { get; set; }
         public double wind_speed_10m { get; set; }
         public double wind_direction_10m { get; set; }
+    }
+    // JSON Class for Elevation
+    public class OpenMeteoElevationResponse
+    {
+        public double[] elevation { get; set; }
     }
 }
