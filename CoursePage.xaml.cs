@@ -15,6 +15,7 @@ public partial class CoursePage : ContentPage
     private Location _lastKnownLocation;
     private Location _lastAnnouncedLocation;
     private Location _lastElevationLocation = null;
+    private Location _activeTeeLocation;
     private List<GolfHole> _holes = new();
     private List<Location> _currentGreenPolygon = new();
     private List<GolfClub> _myBag = new();
@@ -115,8 +116,9 @@ public partial class CoursePage : ContentPage
             _roundShotLocations[holeNumber] = new List<Location>();
         }
 
-        // Drop a pin exactly where the shot was taken from
         _roundShotLocations[holeNumber].Add(new Location(location.Latitude, location.Longitude));
+
+       
     }
 
     private void RemoveLastShotLocation(int holeNumber)
@@ -125,6 +127,8 @@ public partial class CoursePage : ContentPage
         {
             var list = _roundShotLocations[holeNumber];
             list.RemoveAt(list.Count - 1);
+
+           
         }
     }
 
@@ -392,6 +396,257 @@ public partial class CoursePage : ContentPage
     }
 
 
+    //    private async Task DisplayCurrentHoleAsync()
+    //    {
+    //        if (_holes.Count == 0) return;
+
+    //        var currentHole = _holes[_currentIndex];
+
+    //        _currentGreenElevationMeters = null;
+    //        // We DO NOT null out the user's elevation here, because your physical elevation 
+    //        // doesn't change just because you clicked 'Next Hole'!
+
+    //        Task.Run(async () =>
+    //        {
+    //            // Fetch the new hole's green elevation
+    //            _currentGreenElevationMeters = await FetchElevationAsync(currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+    //            // NEW: Once the API returns the data, force the UI to refresh the Plays Like math!
+    //            if (_lastKnownLocation != null)
+    //            {
+    //                UpdateYardages(_lastKnownLocation);
+    //            }
+    //        });
+
+    //        HoleTitleLabel.Text = $"Hole {currentHole.HoleNumber}";
+    //        ParLabel.Text = $"Par {currentHole.Par}";
+
+    //        if (!_roundScores.ContainsKey(currentHole.HoleNumber))
+    //        {
+    //            _roundScores[currentHole.HoleNumber] = 1;
+    //        }
+
+    //        if (!_roundPutts.ContainsKey(currentHole.HoleNumber))
+    //        {
+    //            _roundPutts[currentHole.HoleNumber] = 0;
+    //        }
+
+    //        PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
+    //        ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
+
+    //        if (_lastKnownLocation != null)
+    //        {
+    //            UpdateYardages(_lastKnownLocation);
+    //        }
+    //        else
+    //        {
+    //            Dispatcher.Dispatch(() =>
+    //            {
+    //                PlaysLikeLabel.Text = "-- YDS";
+    //                BackYardageLabel.Text = "-- B";
+    //                YardageLabel.Text = "-- C";
+    //                FrontYardageLabel.Text = "-- F";
+    //            });
+    //        }
+
+    //        var holeFeatures = await _dbService.GetMapFeaturesForHoleAsync(_courseName, currentHole.HoleNumber);
+
+    //        var greenFeature = holeFeatures.FirstOrDefault(f => f.FeatureType == "Green");
+    //        if (greenFeature != null)
+    //        {
+    //            var rawNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(greenFeature.SerializedCoordinates);
+    //            _currentGreenPolygon = rawNodes?.Select(n => new Location(n.lat, n.lon)).ToList() ?? new List<Location>();
+    //        }
+    //        else
+    //        {
+    //            _currentGreenPolygon.Clear();
+    //        }
+
+    //        double activeTeeLat = currentHole.TeeLatitude;
+    //        double activeTeeLon = currentHole.TeeLongitude;
+    //        _activeTeeLocation = new Location(activeTeeLat, activeTeeLon);
+
+
+    //        if (!string.IsNullOrEmpty(_selectedTeeColor))
+    //        {
+    //            var teeFeature = holeFeatures.FirstOrDefault(f => f.FeatureType == "Tee" && f.TeeColor?.ToLower() == _selectedTeeColor.ToLower());
+    //            if (teeFeature != null && !string.IsNullOrEmpty(teeFeature.SerializedCoordinates))
+    //            {
+    //                var rawTeeNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(teeFeature.SerializedCoordinates);
+    //                if (rawTeeNodes != null && rawTeeNodes.Count > 0)
+    //                {
+    //                    activeTeeLat = rawTeeNodes.First().lat;
+    //                    activeTeeLon = rawTeeNodes.First().lon;
+    //                }
+    //            }
+    //        }
+
+    //        double midLat = (activeTeeLat + currentHole.GreenLatitude) / 2;
+    //        double midLon = (activeTeeLon + currentHole.GreenLongitude) / 2;
+    //        double bearing = CalculateBearing(activeTeeLat, activeTeeLon, currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+    //        UpdateWindOverlayForCurrentHole(bearing);
+
+    //        double distanceMeters = Location.CalculateDistance(activeTeeLat, activeTeeLon, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
+    //        if (distanceMeters < 50) distanceMeters = 50;
+
+    //        Dispatcher.Dispatch(() =>
+    //        {
+    //            CourseMap.Pins.Clear();
+    //            CourseMap.MapElements.Clear();
+
+    //#if ANDROID
+    //            var mapHandlerForClearing = CourseMap.Handler as Microsoft.Maui.Maps.Handlers.MapHandler;
+    //            if (mapHandlerForClearing?.Map is Android.Gms.Maps.GoogleMap googleMapForClearing)
+    //            {
+    //                googleMapForClearing.Clear();
+    //            }
+    //#endif
+
+    //            // --- NEW: DRAW DYNAMIC LAYUP ARCS & AXIS ---
+    //            if (_showLayupArcs)
+    //            {
+    //                var greenCenter = new Location(currentHole.GreenLatitude, currentHole.GreenLongitude);
+    //                var activeTee = new Location(activeTeeLat, activeTeeLon);
+
+    //                // 1. Draw the Center Axis Line (from the Green out to 220 yards)
+    //                double axisBearing = CalculateBearing(greenCenter.Latitude, greenCenter.Longitude, activeTee.Latitude, activeTee.Longitude);
+    //                double axisDistMeters = 220 * 0.9144;
+    //                double earthRad = 6378137.0;
+    //                double angDist = axisDistMeters / earthRad;
+
+    //                double cLatRad = greenCenter.Latitude * (Math.PI / 180.0);
+    //                double cLonRad = greenCenter.Longitude * (Math.PI / 180.0);
+    //                double bRad = axisBearing * (Math.PI / 180.0);
+
+    //                double endLatRad = Math.Asin(Math.Sin(cLatRad) * Math.Cos(angDist) + Math.Cos(cLatRad) * Math.Sin(angDist) * Math.Cos(bRad));
+    //                double endLonRad = cLonRad + Math.Atan2(Math.Sin(bRad) * Math.Sin(angDist) * Math.Cos(cLatRad), Math.Cos(angDist) - Math.Sin(cLatRad) * Math.Sin(endLatRad));
+
+    //                var axisLine = new Microsoft.Maui.Controls.Maps.Polyline
+    //                {
+    //                    StrokeColor = Color.FromRgba(200, 200, 200, 150), // Subtle Gray
+    //                    StrokeWidth = 2
+    //                };
+    //                axisLine.Geopath.Add(greenCenter);
+    //                axisLine.Geopath.Add(new Location(endLatRad * (180.0 / Math.PI), endLonRad * (180.0 / Math.PI)));
+
+    //                CourseMap.MapElements.Add(axisLine);
+
+    //                // 2. Draw the 200-Yard Arc (Blue)
+    //                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 200, Color.FromRgba(65, 105, 225, 200)));
+
+    //                // 3. Draw the 150-Yard Arc (White)
+    //                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 150, Color.FromRgba(255, 255, 255, 200)));
+
+    //                // 4. Draw the 100-Yard Arc (Red)
+    //                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 100, Color.FromRgba(220, 20, 60, 200)));
+    //            }
+
+    //            foreach (var feature in holeFeatures)
+    //            {
+    //                var rawNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(feature.SerializedCoordinates);
+    //                if (rawNodes == null || rawNodes.Count == 0) continue;
+
+    //                var polygon = new Microsoft.Maui.Controls.Maps.Polygon
+    //                {
+    //                    StrokeWidth = 2
+    //                };
+
+    //                switch (feature.FeatureType)
+    //                {
+    //                    case "Fairway":
+    //                        polygon.FillColor = Color.FromRgba(144, 238, 144, 100);
+    //                        polygon.StrokeColor = Colors.LightGreen;
+    //                        break;
+    //                    case "Green":
+    //                        polygon.FillColor = Color.FromRgba(0, 100, 0, 150);
+    //                        polygon.StrokeColor = Colors.DarkGreen;
+    //                        break;
+    //                    case "Bunker":
+    //                        polygon.FillColor = Color.FromRgba(245, 245, 220, 150);
+    //                        polygon.StrokeColor = Colors.SandyBrown;
+    //                        break;
+    //                    case "Water":
+    //                        polygon.FillColor = Color.FromRgba(0, 0, 255, 120);
+    //                        polygon.StrokeColor = Colors.LightBlue;
+    //                        break;
+    //                    default:
+    //                        continue;
+    //                }
+
+    //                //foreach (var node in rawNodes)
+    //                //{
+    //                //    polygon.Geopath.Add(new Location(node.lat, node.lon));
+    //                //}
+    //                var rawLocations = rawNodes.Select(n => new Location(n.lat, n.lon)).ToList();
+    //                var smoothedLocations = SmoothPolygon(rawLocations, 2);
+
+    //                foreach (var loc in smoothedLocations)
+    //                {
+    //                    polygon.Geopath.Add(loc);
+    //                }
+
+    //                _liveTracerLine = new Microsoft.Maui.Controls.Maps.Polyline
+    //                {
+    //                    StrokeColor = Color.FromArgb("#FFC107"), // Bright Gold/Yellow
+    //                    StrokeWidth = 4
+    //                };
+    //                CourseMap.MapElements.Add(_liveTracerLine);
+
+    //                CourseMap.MapElements.Add(polygon);
+    //            }
+
+    //#if ANDROID
+    //            var mapHandler = CourseMap.Handler as Microsoft.Maui.Maps.Handlers.MapHandler;
+    //            if (mapHandler?.Map is Android.Gms.Maps.GoogleMap googleMap)
+    //            {
+    //                googleMap.UiSettings.MyLocationButtonEnabled = false;
+    //                googleMap.UiSettings.ZoomControlsEnabled = false;
+    //                googleMap.UiSettings.CompassEnabled = false;
+    //                googleMap.UiSettings.MapToolbarEnabled = false;
+
+    //                var teePoint = new Android.Gms.Maps.Model.LatLng(activeTeeLat, activeTeeLon);
+    //                var greenPoint = new Android.Gms.Maps.Model.LatLng(currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+    //                var context = Android.App.Application.Context;
+
+    //                float perfectZoom = CalculatePerfectZoom(midLat, distanceMeters, CourseMap.Height);
+
+    //                var cinematicCamera = new Android.Gms.Maps.Model.CameraPosition.Builder()
+    //                    .Target(new Android.Gms.Maps.Model.LatLng(midLat, midLon))
+    //                    .Zoom(perfectZoom)
+    //                    .Bearing((float)bearing)
+    //                    .Build();
+
+    //                googleMap.AnimateCamera(Android.Gms.Maps.CameraUpdateFactory.NewCameraPosition(cinematicCamera));
+
+    //                int teeId = context.Resources.GetIdentifier("tee", "drawable", context.PackageName);
+    //                var teeOptions = new Android.Gms.Maps.Model.MarkerOptions()
+    //                    .SetPosition(teePoint)
+    //                    .SetTitle("Tee")
+    //                    .Anchor(0.5f, 0.5f);
+
+    //                if (teeId != 0) teeOptions.SetIcon(Android.Gms.Maps.Model.BitmapDescriptorFactory.FromResource(teeId));
+    //                googleMap.AddMarker(teeOptions);
+
+    //                int flagId = context.Resources.GetIdentifier("flag", "drawable", context.PackageName);
+    //                var flagOptions = new Android.Gms.Maps.Model.MarkerOptions()
+    //                    .SetPosition(greenPoint)
+    //                    .SetTitle("Green")
+    //                    .Anchor(0.5f, 1.0f);
+
+    //                if (flagId != 0) flagOptions.SetIcon(Android.Gms.Maps.Model.BitmapDescriptorFactory.FromResource(flagId));
+    //                googleMap.AddMarker(flagOptions);
+    //            }
+    //#else
+    //        var centerPosition = new Location(midLat, midLon);
+    //        CourseMap.MoveToRegion(MapSpan.FromCenterAndRadius(centerPosition, Distance.FromMeters(250)));
+    //#endif
+    //        });
+
+    //        UpdateRoundScoreToPar();
+    //    }
+
     private async Task DisplayCurrentHoleAsync()
     {
         if (_holes.Count == 0) return;
@@ -399,20 +654,7 @@ public partial class CoursePage : ContentPage
         var currentHole = _holes[_currentIndex];
 
         _currentGreenElevationMeters = null;
-        // We DO NOT null out the user's elevation here, because your physical elevation 
-        // doesn't change just because you clicked 'Next Hole'!
-
-        Task.Run(async () =>
-        {
-            // Fetch the new hole's green elevation
-            _currentGreenElevationMeters = await FetchElevationAsync(currentHole.GreenLatitude, currentHole.GreenLongitude);
-
-            // NEW: Once the API returns the data, force the UI to refresh the Plays Like math!
-            if (_lastKnownLocation != null)
-            {
-                UpdateYardages(_lastKnownLocation);
-            }
-        });
+        _lastElevationLocation = null;
 
         HoleTitleLabel.Text = $"Hole {currentHole.HoleNumber}";
         ParLabel.Text = $"Par {currentHole.Par}";
@@ -430,21 +672,7 @@ public partial class CoursePage : ContentPage
         PuttLabel.Text = _roundPutts[currentHole.HoleNumber].ToString();
         ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
 
-        if (_lastKnownLocation != null)
-        {
-            UpdateYardages(_lastKnownLocation);
-        }
-        else
-        {
-            Dispatcher.Dispatch(() =>
-            {
-                PlaysLikeLabel.Text = "-- YDS";
-                BackYardageLabel.Text = "-- B";
-                YardageLabel.Text = "-- C";
-                FrontYardageLabel.Text = "-- F";
-            });
-        }
-
+        // 1. FETCH MAP FEATURES FIRST
         var holeFeatures = await _dbService.GetMapFeaturesForHoleAsync(_courseName, currentHole.HoleNumber);
 
         var greenFeature = holeFeatures.FirstOrDefault(f => f.FeatureType == "Green");
@@ -458,6 +686,7 @@ public partial class CoursePage : ContentPage
             _currentGreenPolygon.Clear();
         }
 
+        // 2. DETERMINE ACTIVE TEE LOCATION
         double activeTeeLat = currentHole.TeeLatitude;
         double activeTeeLon = currentHole.TeeLongitude;
 
@@ -475,6 +704,36 @@ public partial class CoursePage : ContentPage
             }
         }
 
+        // 3. SET THE GLOBAL ACTIVE TEE HERE (Before any yardage or tracer updates!)
+        _activeTeeLocation = new Location(activeTeeLat, activeTeeLon);
+
+        // 4. NOW UPDATE YARDAGES
+        if (_lastKnownLocation != null)
+        {
+            UpdateYardages(_lastKnownLocation);
+        }
+        else
+        {
+            Dispatcher.Dispatch(() =>
+            {
+                PlaysLikeLabel.Text = "-- YDS";
+                BackYardageLabel.Text = "-- B";
+                YardageLabel.Text = "-- C";
+                FrontYardageLabel.Text = "-- F";
+            });
+        }
+
+        // 5. FETCH ELEVATION IN BACKGROUND
+        Task.Run(async () =>
+        {
+            _currentGreenElevationMeters = await FetchElevationAsync(currentHole.GreenLatitude, currentHole.GreenLongitude);
+            if (_lastKnownLocation != null)
+            {
+                UpdateYardages(_lastKnownLocation);
+            }
+        });
+
+        // 6. CALCULATE MAP CAMERA BOUNDS
         double midLat = (activeTeeLat + currentHole.GreenLatitude) / 2;
         double midLon = (activeTeeLon + currentHole.GreenLongitude) / 2;
         double bearing = CalculateBearing(activeTeeLat, activeTeeLon, currentHole.GreenLatitude, currentHole.GreenLongitude);
@@ -484,10 +743,14 @@ public partial class CoursePage : ContentPage
         double distanceMeters = Location.CalculateDistance(activeTeeLat, activeTeeLon, currentHole.GreenLatitude, currentHole.GreenLongitude, DistanceUnits.Kilometers) * 1000.0;
         if (distanceMeters < 50) distanceMeters = 50;
 
+        // 7. DRAW EVERYTHING
         Dispatcher.Dispatch(() =>
         {
             CourseMap.Pins.Clear();
             CourseMap.MapElements.Clear();
+            
+
+
 
 #if ANDROID
             var mapHandlerForClearing = CourseMap.Handler as Microsoft.Maui.Maps.Handlers.MapHandler;
@@ -497,7 +760,7 @@ public partial class CoursePage : ContentPage
             }
 #endif
 
-            // --- NEW: DRAW DYNAMIC LAYUP ARCS & AXIS ---
+            // --- DRAW DYNAMIC LAYUP ARCS & AXIS ---
             if (_showLayupArcs)
             {
                 var greenCenter = new Location(currentHole.GreenLatitude, currentHole.GreenLongitude);
@@ -526,16 +789,13 @@ public partial class CoursePage : ContentPage
 
                 CourseMap.MapElements.Add(axisLine);
 
-                // 2. Draw the 200-Yard Arc (Blue)
-                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 200, Color.FromRgba(65, 105, 225, 200)));
-
-                // 3. Draw the 150-Yard Arc (White)
-                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 150, Color.FromRgba(255, 255, 255, 200)));
-
-                // 4. Draw the 100-Yard Arc (Red)
-                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 100, Color.FromRgba(220, 20, 60, 200)));
+                // 2. Draw Arcs
+                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 200, Color.FromRgba(65, 105, 225, 200))); // Blue
+                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 150, Color.FromRgba(255, 255, 255, 200))); // White
+                CourseMap.MapElements.Add(CreateLayupArc(greenCenter, activeTee, 100, Color.FromRgba(220, 20, 60, 200)));  // Red
             }
 
+            // --- DRAW POLYGONS ---
             foreach (var feature in holeFeatures)
             {
                 var rawNodes = System.Text.Json.JsonSerializer.Deserialize<List<MainPage.OverpassGeometry>>(feature.SerializedCoordinates);
@@ -568,10 +828,6 @@ public partial class CoursePage : ContentPage
                         continue;
                 }
 
-                //foreach (var node in rawNodes)
-                //{
-                //    polygon.Geopath.Add(new Location(node.lat, node.lon));
-                //}
                 var rawLocations = rawNodes.Select(n => new Location(n.lat, n.lon)).ToList();
                 var smoothedLocations = SmoothPolygon(rawLocations, 2);
 
@@ -582,6 +838,8 @@ public partial class CoursePage : ContentPage
 
                 CourseMap.MapElements.Add(polygon);
             }
+
+           
 
 #if ANDROID
             var mapHandler = CourseMap.Handler as Microsoft.Maui.Maps.Handlers.MapHandler;
@@ -828,10 +1086,9 @@ public partial class CoursePage : ContentPage
             YardageLabel.Text = $"{centerYards} C";
             FrontYardageLabel.Text = $"{frontYards} F";
 
-            UpdateClubSuggestion(playsLikeYards);
+            UpdateClubSuggestion(playsLikeYards);        
         });
     }
-
     private void Geolocation_LocationChanged(object sender, GeolocationLocationChangedEventArgs e)
     {
         var myLocation = e.Location;
@@ -862,9 +1119,7 @@ public partial class CoursePage : ContentPage
 
             double distToNextTeeYards = distToNextTeeMeters * 1.09361;
 
-            // NEW: To transition, they must walk OFF the green (> 30 yards away) 
-            // AND be within a massive 120-yard net of the next tee's center coordinates.
-            if (distToNextTeeYards <= 120 && _currentCenterYards > 30)
+            if (distToNextTeeYards <= 30 && _currentCenterYards > 40)
             {
                 // IMMEDIATELY disable the handshake so the GPS doesn't spam this
                 _hasReachedGreen = false;
