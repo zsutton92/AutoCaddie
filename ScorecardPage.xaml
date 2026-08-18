@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:microcharts="clr-namespace:Microcharts.Maui;assembly=Microcharts.Maui"
              x:Class="AutoCaddie.ScorecardPage"
-             Title="Scorecard"
+             Title="Round Overview"
              BackgroundColor="{AppThemeBinding Light=#F8F9FA, Dark=#121212}">
 
     <ScrollView>
@@ -51,71 +51,26 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Column Header Legend -->
-            <Grid ColumnDefinitions="*, *, *, *" Padding="15,0">
-                <Label Grid.Column="0" Text="HOLE" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#888888, Dark=#999999}" HorizontalOptions="Center" />
-                <Label Grid.Column="1" Text="PAR" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#888888, Dark=#999999}" HorizontalOptions="Center" />
-                <Label Grid.Column="2" Text="SCORE" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#888888, Dark=#999999}" HorizontalOptions="Center" />
-                <Label Grid.Column="3" Text="PUTTS" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#4A34D4, Dark=#9B84EC}" HorizontalOptions="Center" />
-            </Grid>
+            <!-- Front 9 Table -->
+            <Label Text="FRONT 9" FontSize="12" FontAttributes="Bold" TextColor="#7C4DFF" Margin="5,4,0,0" />
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" Padding="6" CornerRadius="10" BorderColor="{AppThemeBinding Light=#E0E0E0, Dark=#333333}" HasShadow="False">
+                <Grid x:Name="Front9Grid" RowSpacing="6" ColumnSpacing="2">
+                    <!-- Populated programmatically -->
+                </Grid>
+            </Frame>
 
-            <!-- Hole-by-Hole Rows -->
-            <VerticalStackLayout x:Name="ScoresList" Spacing="4">
-                <BindableLayout.ItemTemplate>
-                    <DataTemplate>
-                        <Border Padding="15,10" 
-                                StrokeThickness="1" 
-                                Stroke="{AppThemeBinding Light=#EEEEEE, Dark=#2A2A2A}" 
-                                BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="8" />
-                            </Border.StrokeShape>
-
-                            <Grid ColumnDefinitions="*, *, *, *">
-                                <!-- Hole Number -->
-                                <Label Grid.Column="0" 
-                                       Text="{Binding HoleNumber}" 
-                                       FontSize="18" 
-                                       FontAttributes="Bold" 
-                                       TextColor="{AppThemeBinding Light=#222222, Dark=#F0F0F0}" 
-                                       HorizontalOptions="Center" 
-                                       VerticalOptions="Center"/>
-
-                                <!-- Par -->
-                                <Label Grid.Column="1" 
-                                       Text="{Binding Par}" 
-                                       FontSize="18" 
-                                       TextColor="{AppThemeBinding Light=Gray, Dark=#AAAAAA}" 
-                                       HorizontalOptions="Center" 
-                                       VerticalOptions="Center"/>
-
-                                <!-- Strokes -->
-                                <Label Grid.Column="2" 
-                                       Text="{Binding Strokes}" 
-                                       FontSize="18" 
-                                       FontAttributes="Bold" 
-                                       TextColor="{AppThemeBinding Light=#111111, Dark=White}" 
-                                       HorizontalOptions="Center" 
-                                       VerticalOptions="Center"/>
-
-                                <!-- Putts -->
-                                <Label Grid.Column="3" 
-                                       Text="{Binding Putts}" 
-                                       FontSize="18" 
-                                       FontAttributes="Bold" 
-                                       TextColor="{AppThemeBinding Light=#4A34D4, Dark=#9B84EC}" 
-                                       HorizontalOptions="Center" 
-                                       VerticalOptions="Center"/>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </BindableLayout.ItemTemplate>
-            </VerticalStackLayout>
+            <!-- Back 9 Table -->
+            <Label Text="BACK 9" FontSize="12" FontAttributes="Bold" TextColor="#7C4DFF" Margin="5,4,0,0" />
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" Padding="6" CornerRadius="10" BorderColor="{AppThemeBinding Light=#E0E0E0, Dark=#333333}" HasShadow="False">
+                <Grid x:Name="Back9Grid" RowSpacing="6" ColumnSpacing="2">
+                    <!-- Populated programmatically -->
+                </Grid>
+            </Frame>
 
             <!-- Analytics Divider -->
             <BoxView HeightRequest="1" 
-                     Color="{AppThemeBinding Light=#EEEEEE, Dark=#2A2A2A}" 
-                     Margin="0,10" />
+                     Color="{AppThemeBinding Light=#E0E0E0, Dark=#2A2A2A}" 
+                     Margin="0,15" />
 
             <!-- Analytics Section Titles -->
             <Label Text="Stroke Trend" 
@@ -129,8 +84,8 @@
                    FontSize="20" 
                    FontAttributes="Bold" 
                    TextColor="{AppThemeBinding Light=#222222, Dark=#F0F0F0}" 
-                   Margin="5,10,0,0" />
-            <microcharts:ChartView x:Name="PuttsChart" HeightRequest="150" Margin="0,0,0,20" />
+                   Margin="5,15,0,0" />
+            <microcharts:ChartView x:Name="PuttsChart" HeightRequest="150" Margin="0,0,0,30" />
 
         </VerticalStackLayout>
     </ScrollView>

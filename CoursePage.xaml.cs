@@ -536,9 +536,16 @@ public partial class CoursePage : ContentPage
                         continue;
                 }
 
-                foreach (var node in rawNodes)
+                //foreach (var node in rawNodes)
+                //{
+                //    polygon.Geopath.Add(new Location(node.lat, node.lon));
+                //}
+                var rawLocations = rawNodes.Select(n => new Location(n.lat, n.lon)).ToList();
+                var smoothedLocations = SmoothPolygon(rawLocations, 2);
+
+                foreach (var loc in smoothedLocations)
                 {
-                    polygon.Geopath.Add(new Location(node.lat, node.lon));
+                    polygon.Geopath.Add(loc);
                 }
 
                 CourseMap.MapElements.Add(polygon);
@@ -792,8 +799,8 @@ public partial class CoursePage : ContentPage
 
         var currentHole = _holes[_currentIndex];
 
-        // 1. Check if they have reached the current green (within 30 yards of the pin)
-        if (!_hasReachedGreen && _currentCenterYards <= 30)
+        // 1. Check if they have reached the current green (within 50 yards of the pin)
+        if (!_hasReachedGreen && _currentCenterYards <= 50)
         {
             _hasReachedGreen = true;
         }
@@ -909,6 +916,37 @@ public partial class CoursePage : ContentPage
             RoundToParLabel.Text = $"{displayStrokes} ({formattedScore})";
         });
     }
+    // Smooths jagged OpenStreetMap polygons into organic, natural golf course shapes
+    private List<Location> SmoothPolygon(List<Location> points, int iterations = 2)
+    {
+        if (points == null || points.Count < 3) return points;
+
+        var smoothed = new List<Location>(points);
+
+        for (int i = 0; i < iterations; i++)
+        {
+            var temp = new List<Location>();
+            for (int j = 0; j < smoothed.Count; j++)
+            {
+                var p1 = smoothed[j];
+                var p2 = smoothed[(j + 1) % smoothed.Count]; // Wraps around to close the loop
+
+                // Chaikin's magic numbers: grab points at 25% and 75% along the segment
+                double qLat = 0.75 * p1.Latitude + 0.25 * p2.Latitude;
+                double qLon = 0.75 * p1.Longitude + 0.25 * p2.Longitude;
+
+                double rLat = 0.25 * p1.Latitude + 0.75 * p2.Latitude;
+                double rLon = 0.25 * p1.Longitude + 0.75 * p2.Longitude;
+
+                temp.Add(new Location(qLat, qLon));
+                temp.Add(new Location(rLat, rLon));
+            }
+            smoothed = temp;
+        }
+
+        return smoothed;
+    }
+
     private async void OnNextHole_Clicked(object sender, EventArgs e)
     {
         if (_holes.Count == 0) return;
@@ -946,9 +984,9 @@ public partial class CoursePage : ContentPage
 
     private async void OnYardageBadge_Tapped(object sender, TappedEventArgs e)
     {
-        if (YardageLabel.Text != "-- YDS")
+        if (YardageLabel.Text != "-- C")
         {
-            string speechText = YardageLabel.Text.Replace("YDS", "yards to the center");
+            string speechText = YardageLabel.Text.Replace("C", "yards to the center");
             speechText += GetSpokenCaddieSuggestion();
 
             await TextToSpeech.Default.SpeakAsync(speechText, _caddieVoice);
@@ -1025,6 +1063,266 @@ public partial class CoursePage : ContentPage
 
             await Navigation.PopAsync();
         }
+    }
+
+    private void OnShowScorecard_Tapped(object sender, EventArgs e)
+    {
+        BuildAndDisplayScorecard();
+        ScorecardOverlay.IsVisible = true;
+    }
+
+    private void OnCloseScorecard_Clicked(object sender, EventArgs e)
+    {
+        ScorecardOverlay.IsVisible = false;
+    }
+
+    private void BuildAndDisplayScorecard()
+    {
+        ScorecardCourseNameLabel.Text = _courseName;
+
+        // Reset grids
+        Front9Grid.Children.Clear();
+        Front9Grid.RowDefinitions.Clear();
+        Front9Grid.ColumnDefinitions.Clear();
+
+        Back9Grid.Children.Clear();
+        Back9Grid.RowDefinitions.Clear();
+        Back9Grid.ColumnDefinitions.Clear();
+
+        var frontHoles = _holes.Where(h => h.HoleNumber <= 9).OrderBy(h => h.HoleNumber).ToList();
+        var backHoles = _holes.Where(h => h.HoleNumber > 9 && h.HoleNumber <= 18).OrderBy(h => h.HoleNumber).ToList();
+
+        PopulateScorecardHalf(Front9Grid, frontHoles, "OUT");
+        PopulateScorecardHalf(Back9Grid, backHoles, "IN");
+
+        // Calculate Overall Totals
+        int totalPar = _holes.Sum(h => h.Par);
+        int totalStrokes = 0;
+        int completedPar = 0;
+
+        foreach (var hole in _holes)
+        {
+            if (_roundScores.TryGetValue(hole.HoleNumber, out int strokes))
+            {
+                int putts = _roundPutts.TryGetValue(hole.HoleNumber, out int p) ? p : 0;
+                bool isCompleted = (hole.HoleNumber <= _currentIndex) || putts > 0 || strokes > 1;
+
+                if (isCompleted)
+                {
+                    totalStrokes += strokes;
+                    completedPar += hole.Par;
+                }
+            }
+        }
+
+        ScorecardTotalParLabel.Text = totalPar.ToString();
+        ScorecardTotalScoreLabel.Text = totalStrokes > 0 ? totalStrokes.ToString() : "--";
+
+        int diff = totalStrokes - completedPar;
+        if (totalStrokes == 0 || completedPar == 0)
+        {
+            ScorecardTotalToParLabel.Text = "E";
+            ScorecardTotalToParLabel.TextColor = Colors.White;
+        }
+        else
+        {
+            ScorecardTotalToParLabel.Text = diff == 0 ? "E" : (diff > 0 ? $"+{diff}" : $"{diff}");
+            ScorecardTotalToParLabel.TextColor = diff <= 0 ? Color.FromArgb("#69F0AE") : Color.FromArgb("#FF8A80");
+        }
+    }
+
+    private void PopulateScorecardHalf(Grid targetGrid, List<GolfHole> holes, string totalLabel)
+    {
+        if (holes == null || holes.Count == 0) return;
+
+        // Columns: Hole 1..9 (or 10..18) + OUT/IN summary column
+        for (int i = 0; i <= holes.Count; i++)
+        {
+            targetGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        }
+
+        // Rows: Header (Hole #), Par, Score, Putts
+        targetGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Hole
+        targetGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Par
+        targetGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Score
+        targetGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Putts
+
+        int totalHalfPar = 0;
+        int totalHalfScore = 0;
+        int totalHalfPutts = 0;
+
+        for (int col = 0; col < holes.Count; col++)
+        {
+            var hole = holes[col];
+            totalHalfPar += hole.Par;
+
+            bool hasScore = _roundScores.TryGetValue(hole.HoleNumber, out int strokes);
+            bool hasPutts = _roundPutts.TryGetValue(hole.HoleNumber, out int putts);
+
+            // 1. Hole Header Label
+            var holeLabel = new Label
+            {
+                Text = hole.HoleNumber.ToString(),
+                FontSize = 11,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#B39DDB"),
+                HorizontalTextAlignment = TextAlignment.Center
+            };
+            targetGrid.Add(holeLabel, col, 0);
+
+            // 2. Par Label
+            var parLabel = new Label
+            {
+                Text = hole.Par.ToString(),
+                FontSize = 12,
+                TextColor = Color.FromArgb("#AAAAAA"),
+                HorizontalTextAlignment = TextAlignment.Center
+            };
+            targetGrid.Add(parLabel, col, 1);
+
+            // 3. Score Element (Traditional Circles and Squares)
+            View scoreElement;
+
+            if (hasScore && (strokes > 1 || putts > 0 || hole.HoleNumber < _currentIndex + 1))
+            {
+                totalHalfScore += strokes;
+                int diff = strokes - hole.Par;
+
+                var cellGrid = new Grid
+                {
+                    WidthRequest = 28,
+                    HeightRequest = 28,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center
+                };
+
+                // Base text color
+                Color scoreTextColor = Colors.White;
+                Color shapeColor = Colors.White;
+
+                // Color-code the shapes (Greenish for Under Par, Reddish for Over Par)
+                if (diff < 0) shapeColor = Color.FromArgb("#69F0AE");
+                else if (diff > 0) shapeColor = Color.FromArgb("#FF8A80");
+
+                double thickness = 1.5;
+
+                // Under Par (Circles)
+                if (diff < 0)
+                {
+                    int circles = Math.Abs(diff);
+                    if (circles > 3) circles = 3; // Cap at 3 (Albatross)
+
+                    for (int i = 0; i < circles; i++)
+                    {
+                        cellGrid.Children.Add(new Microsoft.Maui.Controls.Shapes.Ellipse
+                        {
+                            Stroke = shapeColor,
+                            StrokeThickness = thickness,
+                            Margin = new Thickness(i * 3), // Nests the rings inward
+                            Fill = Colors.Transparent
+                        });
+                    }
+                }
+                // Over Par (Squares)
+                else if (diff > 0)
+                {
+                    int squares = diff;
+                    if (squares > 3) squares = 3; // Cap at 3 (Triple Bogey)
+
+                    for (int i = 0; i < squares; i++)
+                    {
+                        cellGrid.Children.Add(new Microsoft.Maui.Controls.Shapes.Rectangle
+                        {
+                            Stroke = shapeColor,
+                            StrokeThickness = thickness,
+                            Margin = new Thickness(i * 3), // Nests the squares inward
+                            Fill = Colors.Transparent
+                        });
+                    }
+                }
+
+                // If Par (diff == 0), it adds no shapes, just the plain number.
+
+                // Add the actual score number on top of the shapes
+                cellGrid.Children.Add(new Label
+                {
+                    Text = strokes.ToString(),
+                    FontSize = 13,
+                    FontAttributes = FontAttributes.Bold,
+                    TextColor = scoreTextColor,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                    VerticalTextAlignment = TextAlignment.Center
+                });
+
+                scoreElement = cellGrid;
+            }
+            else
+            {
+                // Blank fallback if the hole hasn't been played yet
+                scoreElement = new Label
+                {
+                    Text = "-",
+                    FontSize = 13,
+                    FontAttributes = FontAttributes.Bold,
+                    TextColor = Colors.White,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                    VerticalTextAlignment = TextAlignment.Center
+                };
+            }
+
+            targetGrid.Add(scoreElement, col, 2);
+
+            // 4. Putts Label
+            string puttsText = hasPutts && putts > 0 ? putts.ToString() : "-";
+            if (hasPutts) totalHalfPutts += putts;
+
+            var puttsLabel = new Label
+            {
+                Text = puttsText,
+                FontSize = 11,
+                TextColor = Color.FromArgb("#888888"),
+                HorizontalTextAlignment = TextAlignment.Center
+            };
+            targetGrid.Add(puttsLabel, col, 3);
+        }
+
+        // --- Totals Column (OUT / IN) ---
+        int totalCol = holes.Count;
+
+        targetGrid.Add(new Label
+        {
+            Text = totalLabel,
+            FontSize = 11,
+            FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#7C4DFF"),
+            HorizontalTextAlignment = TextAlignment.Center
+        }, totalCol, 0);
+
+        targetGrid.Add(new Label
+        {
+            Text = totalHalfPar.ToString(),
+            FontSize = 12,
+            FontAttributes = FontAttributes.Bold,
+            TextColor = Colors.White,
+            HorizontalTextAlignment = TextAlignment.Center
+        }, totalCol, 1);
+
+        targetGrid.Add(new Label
+        {
+            Text = totalHalfScore > 0 ? totalHalfScore.ToString() : "-",
+            FontSize = 13,
+            FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#69F0AE"),
+            HorizontalTextAlignment = TextAlignment.Center
+        }, totalCol, 2);
+
+        targetGrid.Add(new Label
+        {
+            Text = totalHalfPutts > 0 ? totalHalfPutts.ToString() : "-",
+            FontSize = 11,
+            TextColor = Color.FromArgb("#AAAAAA"),
+            HorizontalTextAlignment = TextAlignment.Center
+        }, totalCol, 3);
     }
 
 

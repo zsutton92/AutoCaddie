@@ -130,7 +130,12 @@
                             FontAttributes="Bold"
                             CornerRadius="8" />
 
+                    <!-- FIXED: Tap Gesture wrapped directly around the existing navigation header -->
                     <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" VerticalOptions="Center">
+                        <VerticalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnShowScorecard_Tapped" />
+                        </VerticalStackLayout.GestureRecognizers>
+
                         <Label x:Name="HoleTitleLabel" 
                                Text="Hole 1" 
                                FontSize="20" 
@@ -183,6 +188,85 @@
                 </Grid>
             </VerticalStackLayout>
         </Frame>
+
+        <!-- 18-HOLE SCORECARD OVERLAY -->
+        <Grid x:Name="ScorecardOverlay"
+              Grid.RowSpan="2"
+              IsVisible="False"
+              BackgroundColor="#CC000000"
+              HorizontalOptions="FillAndExpand"
+              VerticalOptions="FillAndExpand"
+              Padding="12,24">
+
+            <Frame BackgroundColor="#1E1E1E"
+                   CornerRadius="16"
+                   Padding="16"
+                   BorderColor="#333333"
+                   VerticalOptions="Center"
+                   HorizontalOptions="FillAndExpand">
+
+                <ScrollView>
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- Modal Header -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Scorecard" FontSize="22" FontAttributes="Bold" TextColor="White" />
+                                <Label x:Name="ScorecardCourseNameLabel" Text="Course Name" FontSize="13" TextColor="#AAAAAA" />
+                            </VerticalStackLayout>
+
+                            <Button Grid.Column="1"
+                                    Text="✕"
+                                    FontSize="16"
+                                    FontAttributes="Bold"
+                                    BackgroundColor="#2C2C2C"
+                                    TextColor="White"
+                                    CornerRadius="20"
+                                    WidthRequest="40"
+                                    HeightRequest="40"
+                                    Clicked="OnCloseScorecard_Clicked" />
+                        </Grid>
+
+                        <!-- Front 9 Table -->
+                        <Label Text="FRONT 9" FontSize="12" FontAttributes="Bold" TextColor="#7C4DFF" Margin="0,4,0,0" />
+                        <Frame BackgroundColor="#262626" Padding="6" CornerRadius="10" BorderColor="#3A3A3A">
+                            <Grid x:Name="Front9Grid" RowSpacing="6" ColumnSpacing="2">
+                                <!-- Populated programmatically for perfect alignment -->
+                            </Grid>
+                        </Frame>
+
+                        <!-- Back 9 Table -->
+                        <Label Text="BACK 9" FontSize="12" FontAttributes="Bold" TextColor="#7C4DFF" Margin="0,4,0,0" />
+                        <Frame BackgroundColor="#262626" Padding="6" CornerRadius="10" BorderColor="#3A3A3A">
+                            <Grid x:Name="Back9Grid" RowSpacing="6" ColumnSpacing="2">
+                                <!-- Populated programmatically for perfect alignment -->
+                            </Grid>
+                        </Frame>
+
+                        <!-- Total Summary Card -->
+                        <Frame BackgroundColor="#2D2245" Padding="12" CornerRadius="10" BorderColor="#512BD4">
+                            <Grid ColumnDefinitions="*,*,*">
+                                <VerticalStackLayout Grid.Column="0" HorizontalOptions="Center">
+                                    <Label Text="TOTAL PAR" FontSize="11" TextColor="#B39DDB" HorizontalTextAlignment="Center" />
+                                    <Label x:Name="ScorecardTotalParLabel" Text="72" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center">
+                                    <Label Text="TOTAL SCORE" FontSize="11" TextColor="#B39DDB" HorizontalTextAlignment="Center" />
+                                    <Label x:Name="ScorecardTotalScoreLabel" Text="--" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center">
+                                    <Label Text="TO PAR" FontSize="11" TextColor="#B39DDB" HorizontalTextAlignment="Center" />
+                                    <Label x:Name="ScorecardTotalToParLabel" Text="E" FontSize="18" FontAttributes="Bold" TextColor="#69F0AE" HorizontalTextAlignment="Center" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Frame>
+
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Frame>
+        </Grid>
 
         <!-- Custom Club Selection Overlay -->
         <Grid x:Name="ClubSelectionOverlay" 
