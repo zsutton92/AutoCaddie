@@ -399,12 +399,19 @@ public partial class CoursePage : ContentPage
         var currentHole = _holes[_currentIndex];
 
         _currentGreenElevationMeters = null;
-        _currentUserElevationMeters = null;
-        _lastElevationLocation = null;
+        // We DO NOT null out the user's elevation here, because your physical elevation 
+        // doesn't change just because you clicked 'Next Hole'!
 
         Task.Run(async () =>
         {
+            // Fetch the new hole's green elevation
             _currentGreenElevationMeters = await FetchElevationAsync(currentHole.GreenLatitude, currentHole.GreenLongitude);
+
+            // NEW: Once the API returns the data, force the UI to refresh the Plays Like math!
+            if (_lastKnownLocation != null)
+            {
+                UpdateYardages(_lastKnownLocation);
+            }
         });
 
         HoleTitleLabel.Text = $"Hole {currentHole.HoleNumber}";
@@ -786,11 +793,24 @@ public partial class CoursePage : ContentPage
 
         // 4B. SLOPE MATH
         double slopeImpactYards = 0;
+        string elevationString = "-- ft";
+
         if (_currentGreenElevationMeters.HasValue && _currentUserElevationMeters.HasValue)
         {
+            // Calculate raw difference in meters
+            double diffMeters = _currentGreenElevationMeters.Value - _currentUserElevationMeters.Value;
+
+            // Convert to feet for the UI badge
+            double diffFeet = Math.Round(diffMeters * 3.28084);
+
+            if (diffFeet > 0)
+                elevationString = $"↑ {Math.Abs(diffFeet)} ft";
+            else if (diffFeet < 0)
+                elevationString = $"↓ {Math.Abs(diffFeet)} ft";
+
             // 1 meter of elevation change = ~1.09 yards of distance change
             // If the Green is higher (+), it adds yards. If lower (-), it subtracts.
-            slopeImpactYards = (_currentGreenElevationMeters.Value - _currentUserElevationMeters.Value) * 1.09361;
+            slopeImpactYards = diffMeters * 1.09361;
         }
 
         // 5. Golf Rule of Thumb: 1 mph of direct wind = ~1 yard of impact.
@@ -799,15 +819,15 @@ public partial class CoursePage : ContentPage
 
         Dispatcher.Dispatch(() =>
         {
-            // Update the huge Plays Like label
+            // Update the huge Plays Like label and the new Elevation badge
             PlaysLikeLabel.Text = $"{playsLikeYards} YDS";
+            ElevationLabel.Text = elevationString;
 
             // Update the small labels B, C, F
             BackYardageLabel.Text = $"{backYards} B";
             YardageLabel.Text = $"{centerYards} C";
             FrontYardageLabel.Text = $"{frontYards} F";
 
-            //UpdateClubSuggestion(centerYards);
             UpdateClubSuggestion(playsLikeYards);
         });
     }
