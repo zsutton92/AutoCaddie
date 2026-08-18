@@ -29,6 +29,9 @@ public class DatabaseService
         await _db.CreateTableAsync<TrackedShot>();
         await _db.CreateTableAsync<AutoCaddie.Models.CourseMapFeature>();
 
+        // NEW: Create the table for our shot tracers
+        await _db.CreateTableAsync<AutoCaddie.Models.RoundShotLocation>();
+
         var clubCount = await _db.Table<GolfClub>().CountAsync();
         if (clubCount == 0)
         {
@@ -75,19 +78,12 @@ public class DatabaseService
         await _db.DeleteAsync(club);
     }
 
-    //public async Task SaveHoleAsync(GolfHole hole)
-    //{
-    //    await Init();
-    //    await _db.InsertAsync(hole);
-    //}
-
     public async Task SaveMapFeatureAsync(AutoCaddie.Models.CourseMapFeature feature)
     {
         await Init();
         await _db.InsertAsync(feature);
     }
 
-    // Fetches every feature for the entire course (useful for deleting or exporting)
     public async Task<List<AutoCaddie.Models.CourseMapFeature>> GetMapFeaturesForCourseAsync(string courseName)
     {
         await Init();
@@ -96,17 +92,9 @@ public class DatabaseService
                         .ToListAsync();
     }
 
-    // Fetches just the features for the specific hole you are playing right now
     public async Task<List<AutoCaddie.Models.CourseMapFeature>> GetMapFeaturesForHoleAsync(string courseName, int holeNumber)
     {
         await Init();
-
-        // We also pull features where HoleNumber == 0 in case we saved a giant 
-        // lake or river that applies to the whole course!
-        //return await _db.Table<AutoCaddie.Models.CourseMapFeature>()
-        //                .Where(f => f.CourseName == courseName &&
-        //                      (f.HoleNumber == holeNumber || f.HoleNumber == 0))
-        //                .ToListAsync();
         return await _db.Table<AutoCaddie.Models.CourseMapFeature>()
                     .Where(f => f.CourseName == courseName &&
                           (f.HoleNumber == holeNumber ||
@@ -118,7 +106,6 @@ public class DatabaseService
     {
         await Init();
 
-        // Find the most recently added shot in the table
         var lastShot = await _db.Table<TrackedShot>()
                                       .OrderByDescending(s => s.Id)
                                       .FirstOrDefaultAsync();
@@ -137,8 +124,6 @@ public class DatabaseService
 
     public async Task<List<GolfHole>> GetHolesAsync()
     {
-        // Note: If your SQLite connection variable is named something other than _db 
-        // (like _database or _connection), update it here!
         await Init();
         return await _db.Table<GolfHole>().ToListAsync();
     }
@@ -157,7 +142,8 @@ public class DatabaseService
     }
 
 
-    public async Task SaveCompletedRoundAsync(string courseName, List<AutoCaddie.Models.GolfHole> holes, Dictionary<int, int> scores, Dictionary<int, int> putts, Dictionary<int, bool?> fairways)
+    // UPDATED: Added shotLocations dictionary parameter
+    public async Task SaveCompletedRoundAsync(string courseName, List<AutoCaddie.Models.GolfHole> holes, Dictionary<int, int> scores, Dictionary<int, int> putts, Dictionary<int, bool?> fairways, Dictionary<int, List<Location>> shotLocations)
     {
         await Init();
 
@@ -210,11 +196,34 @@ public class DatabaseService
 
             await _db.InsertAsync(scoreRecord);
         }
+
+        // 5. NEW: Save all the captured GPS coordinates for the tracer lines
+        if (shotLocations != null)
+        {
+            foreach (var kvp in shotLocations)
+            {
+                int holeNum = kvp.Key;
+                var locations = kvp.Value;
+                int strokeIndex = 1;
+
+                foreach (var loc in locations)
+                {
+                    var shotLoc = new AutoCaddie.Models.RoundShotLocation
+                    {
+                        RoundId = newRound.Id,
+                        HoleNumber = holeNum,
+                        StrokeNumber = strokeIndex,
+                        Latitude = loc.Latitude,
+                        Longitude = loc.Longitude
+                    };
+
+                    await _db.InsertAsync(shotLoc);
+                    strokeIndex++;
+                }
+            }
+        }
     }
 
-  
-
-    // Fetches the specific hole-by-hole scores for a single round
     public async Task<List<HoleScore>> GetScoresForRoundAsync(int roundId)
     {
         await Init();
@@ -234,11 +243,9 @@ public class DatabaseService
     {
         await Init();
 
-        // 1. Log the individual shot
         var shot = new TrackedShot { ClubId = clubId, Distance = distance, DateHit = DateTime.Now };
         await _db.InsertAsync(shot);
 
-        // 2. Update the club's running averages
         var club = await _db.Table<GolfClub>().Where(c => c.Id == clubId).FirstOrDefaultAsync();
         if (club != null)
         {
@@ -248,17 +255,14 @@ public class DatabaseService
         }
     }
 
-    // Gets the high-level summary of all your rounds
     public async Task<List<AutoCaddie.Models.GolfRound>> GetAllRoundsAsync()
     {
         await Init();
-        // Order by newest rounds first
         return await _db.Table<AutoCaddie.Models.GolfRound>()
                         .OrderByDescending(r => r.DatePlayed)
                         .ToListAsync();
     }
 
-    // Gets the 18-hole breakdown for a specific round
     public async Task<List<AutoCaddie.Models.HoleScore>> GetHoleScoresAsync(int roundId)
     {
         await Init();
@@ -268,18 +272,27 @@ public class DatabaseService
                         .ToListAsync();
     }
 
+    // NEW: Pulls the saved tracer coordinates back out so the UI can draw the lines
+    public async Task<List<AutoCaddie.Models.RoundShotLocation>> GetShotLocationsForRoundAsync(int roundId)
+    {
+        await Init();
+        return await _db.Table<AutoCaddie.Models.RoundShotLocation>()
+                        .Where(s => s.RoundId == roundId)
+                        .OrderBy(s => s.HoleNumber)
+                        .ThenBy(s => s.StrokeNumber)
+                        .ToListAsync();
+    }
+
     public async Task DeleteCourseAsync(string courseName)
     {
         await Init();
 
-        // 1. Delete all holes for this course
         var holes = await _db.Table<GolfHole>().Where(h => h.CourseName == courseName).ToListAsync();
         foreach (var hole in holes)
         {
             await _db.DeleteAsync(hole);
         }
 
-        // 2. Delete all map features (fairways, greens, etc.) for this course
         var features = await _db.Table<CourseMapFeature>().Where(f => f.CourseName == courseName).ToListAsync();
         foreach (var feature in features)
         {
@@ -289,14 +302,12 @@ public class DatabaseService
 
     public async Task<List<string>> GetAvailableTeesAsync(string courseName)
     {
-        await Init(); // Ensure DB is initialized
+        await Init();
 
-        // Grab all features for this course that are tagged as "Tee"
         var tees = await _db.Table<AutoCaddie.Models.CourseMapFeature>()
                             .Where(f => f.CourseName == courseName && f.FeatureType == "Tee")
                             .ToListAsync();
 
-        // Extract the colors, remove duplicates, and capitalize them nicely
         var distinctColors = tees.Select(t => t.TeeColor?.ToUpper())
                                  .Where(c => !string.IsNullOrEmpty(c))
                                  .Distinct()
@@ -304,7 +315,4 @@ public class DatabaseService
 
         return distinctColors;
     }
-
-
-
 }

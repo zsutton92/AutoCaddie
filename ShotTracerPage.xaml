@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             x:Class="AutoCaddie.ShotTracerPage"
+             Title="Shot Tracer">
+
+    <Grid>
+        <!-- Full Screen Map -->
+        <maps:Map x:Name="TracerMap" MapType="Satellite" IsShowingUser="False" />
+
+        <!-- Floating Data Card -->
+        <Frame VerticalOptions="End" 
+               HorizontalOptions="Center" 
+               Margin="15,30" 
+               Padding="20,15" 
+               CornerRadius="20" 
+               BackgroundColor="{AppThemeBinding Light=#EEFFFFFF, Dark=#EE1E1E1E}"
+               BorderColor="{AppThemeBinding Light=#D1D1D1, Dark=#333333}"
+               HasShadow="True">
+
+            <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                <Label x:Name="HoleTitleLabel" 
+                       Text="Hole Tracer" 
+                       FontSize="20" 
+                       FontAttributes="Bold" 
+                       TextColor="{AppThemeBinding Light=#4A34D4, Dark=#9B84EC}" 
+                       HorizontalOptions="Center"/>
+
+                <Label x:Name="ShotDetailsLabel" 
+                       Text="Loading GPS coordinates..." 
+                       FontSize="14" 
+                       TextColor="{AppThemeBinding Light=#555555, Dark=#AAAAAA}" 
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Frame>
+    </Grid>
+
+</ContentPage>

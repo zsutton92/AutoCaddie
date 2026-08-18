@@ -21,7 +21,7 @@ public partial class CoursePage : ContentPage
     private Dictionary<int, int> _roundScores = new();
     private Dictionary<int, int> _roundPutts = new();
     private Dictionary<int, bool?> _roundFairways = new();
-
+    private Dictionary<int, List<Location>> _roundShotLocations = new();
     private string _courseName;
     private string _selectedTeeColor;
 
@@ -104,6 +104,28 @@ public partial class CoursePage : ContentPage
 
             WindDirectionArrow.Rotation = relativeAngle;
         });
+    }
+
+    private void RecordShotLocation(int holeNumber, Location location)
+    {
+        if (location == null) return;
+
+        if (!_roundShotLocations.ContainsKey(holeNumber))
+        {
+            _roundShotLocations[holeNumber] = new List<Location>();
+        }
+
+        // Drop a pin exactly where the shot was taken from
+        _roundShotLocations[holeNumber].Add(new Location(location.Latitude, location.Longitude));
+    }
+
+    private void RemoveLastShotLocation(int holeNumber)
+    {
+        if (_roundShotLocations.ContainsKey(holeNumber) && _roundShotLocations[holeNumber].Count > 0)
+        {
+            var list = _roundShotLocations[holeNumber];
+            list.RemoveAt(list.Count - 1);
+        }
     }
 
     private async Task RefreshWeatherInBackgroundAsync()
@@ -239,11 +261,14 @@ public partial class CoursePage : ContentPage
             // --- NEW: Approach Shot Logic ---
             // A shot counts if it's > 15 yards AND (it started > 30 yards from the pin OR ended > 30 yards from the pin)
             // This prevents 15-yard walks back-and-forth across the green from adding ghost strokes
-           
+
             if (shotDistanceToLog >= 15 && (distToCenterFromLastShot > 30 || _currentCenterYards > 30))
             {
                 if (_roundScores.ContainsKey(currentHole.HoleNumber) && _roundScores[currentHole.HoleNumber] < 15)
                 {
+                    // NEW: Drop a GPS pin where the shot started!
+                    RecordShotLocation(currentHole.HoleNumber, _lastAnnouncedLocation);
+
                     _roundScores[currentHole.HoleNumber]++;
 
                     await EvaluateFIRAsync(currentHole);
@@ -1001,6 +1026,7 @@ public partial class CoursePage : ContentPage
 
         if (_roundScores[currentHole.HoleNumber] < 15)
         {
+            RecordShotLocation(currentHole.HoleNumber, _lastKnownLocation);
             _roundScores[currentHole.HoleNumber]++;
             ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
             UpdateRoundScoreToPar();
@@ -1043,7 +1069,7 @@ public partial class CoursePage : ContentPage
 
         if (confirm)
         {
-            await _dbService.SaveCompletedRoundAsync(_courseName, _holes, _roundScores, _roundPutts, _roundFairways);
+            await _dbService.SaveCompletedRoundAsync(_courseName, _holes, _roundScores, _roundPutts, _roundFairways,_roundShotLocations);
 
             if (_isTracking)
             {
@@ -1566,6 +1592,7 @@ public partial class CoursePage : ContentPage
         // Ensure we don't drop below 1 stroke
         if (_roundScores.ContainsKey(currentHole.HoleNumber) && _roundScores[currentHole.HoleNumber] > 1)
         {
+            RemoveLastShotLocation(currentHole.HoleNumber);
             _roundScores[currentHole.HoleNumber]--;
             ScoreLabel.Text = _roundScores[currentHole.HoleNumber].ToString();
 

@@ -6,9 +6,13 @@ namespace AutoCaddie
 {
     public partial class ScorecardPage : ContentPage
     {
+        private GolfRound _currentRound;
+
         public ScorecardPage(GolfRound currentRound, List<HoleScore> roundScores)
         {
             InitializeComponent();
+
+            _currentRound = currentRound;
 
             // 1. Populate the Header Labels
             CourseNameLabel.Text = currentRound.CourseName;
@@ -66,15 +70,27 @@ namespace AutoCaddie
                 bool hasScore = hole.Strokes > 0;
                 bool hasPutts = hole.Putts > 0;
 
-                // 1. Hole Header Label
-                targetGrid.Add(new Label
+                // 1. Hole Header Label (Now Tappable!)
+                var holeLabel = new Label
                 {
                     Text = hole.HoleNumber.ToString(),
-                    FontSize = 11,
+                    FontSize = 13,
                     FontAttributes = FontAttributes.Bold,
                     TextColor = Color.FromArgb("#7A68E6"),
-                    HorizontalTextAlignment = TextAlignment.Center
-                }, col, 0);
+                    TextDecorations = TextDecorations.Underline, // Visual cue that it's a link
+                    HorizontalTextAlignment = TextAlignment.Center,
+                    VerticalTextAlignment = TextAlignment.Center
+                };
+
+                // Hook up the tap gesture to launch the Tracer Map
+                var tapGesture = new TapGestureRecognizer();
+                tapGesture.Tapped += async (s, e) =>
+                {
+                    await Navigation.PushAsync(new ShotTracerPage(_currentRound, hole.HoleNumber));
+                };
+                holeLabel.GestureRecognizers.Add(tapGesture);
+
+                targetGrid.Add(holeLabel, col, 0);
 
                 // 2. Par Label
                 targetGrid.Add(new Label
