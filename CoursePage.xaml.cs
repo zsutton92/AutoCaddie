@@ -237,7 +237,7 @@ public partial class CoursePage : ContentPage
     {
         _announceTimer.Stop();
         double shotDistanceToLog = _lastShotDistance;
-        if (_isMuted) return;
+
 
         if (YardageLabel.Text != "-- YDS")
         {
@@ -285,48 +285,50 @@ public partial class CoursePage : ContentPage
                     UpdateRoundScoreToPar();
                 }
             }
-
-            int currentStroke = _roundScores.ContainsKey(currentHole.HoleNumber) ? _roundScores[currentHole.HoleNumber] : 1;
-            string strokeSpeech = $"Stroke {currentStroke}. ";
-
-            if (shotDistanceToLog >= 250)
+            if (!_isMuted)
             {
-                string[] bigDrives = { "Wow, absolute nuke!", "Killer drive!", "Smashed it!", "Great shot!" };
-                caddieCompliment = bigDrives[rnd.Next(bigDrives.Length)] + " ";
+                int currentStroke = _roundScores.ContainsKey(currentHole.HoleNumber) ? _roundScores[currentHole.HoleNumber] : 1;
+                string strokeSpeech = $"Stroke {currentStroke}. ";
+
+                if (shotDistanceToLog >= 250)
+                {
+                    string[] bigDrives = { "Wow, absolute nuke!", "Killer drive!", "Smashed it!", "Great shot!" };
+                    caddieCompliment = bigDrives[rnd.Next(bigDrives.Length)] + " ";
+                }
+                else if (shotDistanceToLog >= 150)
+                {
+                    string[] solidShots = { "Nice strike!", "Solid shot!", "Looking good!" };
+                    caddieCompliment = solidShots[rnd.Next(solidShots.Length)] + " ";
+                }
+
+                //string yardageSpeech = YardageLabel.Text.Replace("YDS", "yards to the center. ");
+                string yardageSpeech = $"{_currentCenterYards} yards to the center. Playing like {PlaysLikeLabel.Text.Replace("Plays ", "").Replace("YDS", "yards")}. ";
+
+                // --- CHECK FOR HAZARDS NEARBY ---
+                string hazardSpeech = "";
+                if (_lastKnownLocation != null)
+                {
+                    hazardSpeech = await CheckNearestHazardsAsync(_lastKnownLocation) ?? "";
+                }
+
+                string caddieSpeech = GetSpokenCaddieSuggestion();
+
+                // string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
+                // Example: "Great shot! Stroke 2. 145 yards. Playing like 152.  I suggest 8 iron."
+                string finalSpeech = $"{strokeSpeech}{caddieCompliment}{hazardSpeech}{yardageSpeech}{caddieSpeech}";
+
+                if (_caddieVoice != null)
+                {
+                    await TextToSpeech.Default.SpeakAsync(finalSpeech, _caddieVoice);
+                }
+                else
+                {
+                    await TextToSpeech.Default.SpeakAsync(finalSpeech);
+                }
+
+                _lastAnnouncedLocation = _lastKnownLocation;
+                _lastShotDistance = 0;
             }
-            else if (shotDistanceToLog >= 150)
-            {
-                string[] solidShots = { "Nice strike!", "Solid shot!", "Looking good!" };
-                caddieCompliment = solidShots[rnd.Next(solidShots.Length)] + " ";
-            }
-
-            //string yardageSpeech = YardageLabel.Text.Replace("YDS", "yards to the center. ");
-            string yardageSpeech = $"{_currentCenterYards} yards to the center. Playing like { PlaysLikeLabel.Text.Replace("Plays ", "").Replace("YDS","yards")}. ";
-
-            // --- CHECK FOR HAZARDS NEARBY ---
-            string hazardSpeech = "";
-            if (_lastKnownLocation != null)
-            {
-                hazardSpeech = await CheckNearestHazardsAsync(_lastKnownLocation) ?? "";
-            }
-
-            string caddieSpeech = GetSpokenCaddieSuggestion();
-
-            // string finalSpeech = $"{caddieCompliment}{yardageSpeech}{strokeSpeech}{caddieSpeech}";
-            // Example: "Great shot! Stroke 2. 145 yards. Playing like 152.  I suggest 8 iron."
-            string finalSpeech = $"{strokeSpeech}{caddieCompliment}{hazardSpeech}{yardageSpeech}{caddieSpeech}";
-
-            if (_caddieVoice != null)
-            {
-                await TextToSpeech.Default.SpeakAsync(finalSpeech, _caddieVoice);
-            }
-            else
-            {
-                await TextToSpeech.Default.SpeakAsync(finalSpeech);
-            }
-
-            _lastAnnouncedLocation = _lastKnownLocation;
-            _lastShotDistance = 0;
         }
     }
 
@@ -1101,8 +1103,8 @@ public partial class CoursePage : ContentPage
 
         var currentHole = _holes[_currentIndex];
 
-        // 1. Check if they have reached the current green (within 50 yards of the pin)
-        if (!_hasReachedGreen && _currentCenterYards <= 50)
+        
+        if (!_hasReachedGreen && _currentCenterYards <= 45)
         {
             _hasReachedGreen = true;
         }
@@ -1119,7 +1121,7 @@ public partial class CoursePage : ContentPage
 
             double distToNextTeeYards = distToNextTeeMeters * 1.09361;
 
-            if (distToNextTeeYards <= 30 && _currentCenterYards > 40)
+            if (distToNextTeeYards <= 65 && _currentCenterYards > 25)
             {
                 // IMMEDIATELY disable the handshake so the GPS doesn't spam this
                 _hasReachedGreen = false;
